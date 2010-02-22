@@ -132,7 +132,7 @@ class NodeMatch(TorqExpressionWithExpr):
         else:
             newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
             newNode.extend(o)
-            return 1, [ newNode ], d
+            return 1, ( newNode, ), d
 
     def __eq__(self, right): 
         return isinstance(right, NodeMatch) and self.__label == right.label and \
@@ -180,7 +180,7 @@ class AnyNodeMatch(TorqExpressionWithExpr):
         else:
             newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
             newNode.extend(o)
-            return 1, [ newNode ], d
+            return 1, ( newNode, ), d
 
     def __eq__(self, right): 
         return isinstance(right, AnyNodeMatch) and self.expr == right.expr and \
@@ -299,7 +299,7 @@ class BuildToNode(TorqExpressionWithExpr):
         p, o, d = r
         newNode = [ self.__newLabel ]
         newNode.extend(o)
-        return p, [ newNode ], d
+        return p, ( newNode, ), d
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         return self.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
@@ -345,8 +345,7 @@ class Drop(TorqExpressionWithExpr):
     def __make_return_value(self, r):
         if r is None: return None
         p, o, d = r
-        dropSeq = []
-        dropSeq.extend(d)
+        dropSeq = d if _islist(d) else list(d)
         dropSeq.extend(o)
         return p, (), dropSeq
     

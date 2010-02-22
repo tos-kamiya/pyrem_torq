@@ -89,11 +89,11 @@ class XcpThenAny(TorqExpressionWithExpr):
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if self._expr._match_node(inpSeq, inpPos, lookAheadNode) is None: 
-            return 1, [ lookAheadNode ], ()
+            return 1, ( lookAheadNode, ), ()
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         if self._expr._match_lit(inpSeq, inpPos, lookAheadString) is None: 
-            return 1, [ lookAheadString ], ()
+            return 1, ( lookAheadString, ), ()
         
     @staticmethod
     def build(expr): 

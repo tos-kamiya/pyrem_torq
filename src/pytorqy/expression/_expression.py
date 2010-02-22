@@ -52,7 +52,7 @@ class TorqExpression(object):
         if r is None: return 0, [], []
         p, o, d = r
         outSeq = []; outSeq.extend(o)
-        dropSeq = []; dropSeq.extend(d)
+        dropSeq = d if _islist(d) else list(d)
         return p, outSeq, dropSeq
     
     def _match_node(self, inpSeq, inpPos, lookAhead):
@@ -213,9 +213,8 @@ class Seq(TorqExpression):
         p, o, d = r
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos + p
-        outSeq = []; dropSeq = []
-        outSeq.extend(o)
-        dropSeq.extend(d)
+        outSeq = o if _islist(o) else list(o)
+        dropSeq = d if _islist(d) else list(d)
         for expr in self.__exprs[1:]:
             if curInpPos == len_inpSeq:
                 r = expr._match_eon(inpSeq, curInpPos, None)
