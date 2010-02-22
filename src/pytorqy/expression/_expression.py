@@ -55,6 +55,12 @@ class TorqExpression(object):
         dropSeq = d if _islist(d) else list(d)
         return p, outSeq, dropSeq
     
+    def parse(self, inpSeq, dropSeq=None):
+        posDelta, outSeq, _dropSeq = self.match(inpSeq, 1)
+        if 1 + posDelta != len(inpSeq): return None
+        if isinstance(dropSeq, list): dropSeq.append(_dropSeq)
+        return [ inpSeq[0] ] + outSeq
+    
     def _match_node(self, inpSeq, inpPos, lookAhead):
         pass
         # return None

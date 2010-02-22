@@ -1,7 +1,7 @@
 import re, collections
 from pytorqy.expression import *
 from pytorqy.expression_shortname import BtN, L, LC, M, NM
-import pytorqy.treeseq as pt
+#import pytorqy.treeseq as pt
 
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
@@ -29,14 +29,7 @@ def _parsing_expr_iter():
     vscan = NM('v', Scan(M('0')))
     yield Scan(to_recursive(BtN('v', vscan + [1,]*(LC('+-') + vscan))))
 
-_parsing_exprs = list(_parsing_expr_iter())
-
-def parse(seq):
-    for expr in _parsing_exprs:
-        posDelta, outSeq, dropSeq = expr.match(seq, 1)
-        assert 1 + posDelta == len(seq)
-        seq = [ seq[0] ] + outSeq
-    return seq
+parsing_exprs = list(_parsing_expr_iter())
 
 def interpret(ast):
     _opstr_to_func = { '+' : float.__add__, '-' : float.__sub__, 
@@ -73,8 +66,11 @@ usage: calculator <expr>
     text = " ".join(sys.argv[1:])
     seq = tokenize(text)
     #print(seq) # prints tokens
-    ast = parse(seq)
-    #for L in pt.seq_pretty(ast): print(L) # prints an ast
-    result = interpret(ast)
+    for expr in parsing_exprs:
+        newSeq = expr.parse(seq)
+        if newSeq is None: raise SystemError
+        seq = newSeq
+    #for L in pt.seq_pretty(seq): print(L) # prints an seq
+    result = interpret(seq)
     print(result)
     

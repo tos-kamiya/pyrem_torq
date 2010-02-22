@@ -261,6 +261,30 @@ class TestPytorqyExpression(unittest.TestCase):
         expr = Or(Seq(Repeat(Literal("a"), 0, 1), Literal("b")), Literal("c"))
         self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
                 ( [], [ 'a', 'b', 'c' ], False ))
+    
+    def testScan(self):
+        expr = Scan(Seq(InsertNode("here"), Literal("a")))
+        seq = [ 'text', "a", "b", "c", "a" ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 4)
+        self.assertEqual(outSeq, [ [ "here" ], "a", "b", "c", [ "here" ], "a" ])
+
+        expr = Repeat(Or(Seq(InsertNode("here"), Literal("a")), Any()), 0, None)
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 4)
+        self.assertEqual(outSeq, [ [ "here" ], "a", "b", "c", [ "here" ], "a" ])
+        
+    def testScan2(self):
+        expr = Scan(InsertNode("here"))
+        seq = [ 'text', "a", "b", "c" ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 3)
+        self.assertEqual(outSeq, [ [ "here" ], "a", [ "here" ], "b", [ "here" ], "c", [ "here" ] ])
+
+        expr = Repeat(Or(InsertNode("here"), Any()), 0, None)
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 0)
+        self.assertEqual(outSeq, [ ])
 
 def TestSuite(TestPytorqyExpression):
     return unittest.makeSuite(TestPytorqyExpression)

@@ -47,7 +47,7 @@ def parse_to_ast(s, verboseOutput=None):
             rst("comma", ","), rst("semicolon", ";"),
             rst("LP", "("), rst("RP", ")"), 
             rst("plus", "+"), rst("ques", "?"), rst("star", "*"), rst("or", "|"), rst("daller", "$"),
-            rst("match_eq", "match", "="), rst("scan_eq", "scan", "="), rst("tilde", "~"),
+            rst("matches", ":", ":"), rst("tilde", "~"),
             
             # string literal
             BtN("string_literal", [0,1]*LC([ 'i', 'ir', 'r', 'ri' ]) + L('"') + [0,]*(
@@ -72,8 +72,7 @@ def parse_to_ast(s, verboseOutput=None):
     verbosePrintTitle('parseReservedWords')
     def parseReservedWords(seq):
         def rw(name): return NM('id', L(name), newLabel=name) # reserved word
-        def ew(name): return NM('id', L(name) + ErrorExpr("%s is an reserved word" % name))
-        reservedWordExpr = rw('req') | rw('xcp') | ew("match") | ew("scan")
+        reservedWordExpr = rw('req') | rw('xcp') | rw("scan") 
         return __scan_and_fold(seq, reservedWordExpr | A(), "Can't parse reserved words")
     seq = parseReservedWords(seq)
     verbosePrintSeq(seq)    
@@ -83,7 +82,7 @@ def parse_to_ast(s, verboseOutput=None):
         idOrStr = N('id') | N('string_literal')
         preCheckExpr = idOrStr + idOrStr + ErrorExpr("use ',' operator for SEQ expr") \
             | N('RP') + N('id') + ErrorExpr("expected ',' after paren") \
-            | N('id') + N('LP') + ErrorExpr("expected req or xcp before paren")
+            | N('id') + N('LP') + ErrorExpr("expected scan, req or xcp before paren")
         preCheckExpr = preCheckExpr | A()
         return __scan_and_fold(seq, preCheckExpr, "Can't parse pre-checking")
     seq = parsePreChecking(seq)
@@ -105,8 +104,8 @@ def parse_to_ast(s, verboseOutput=None):
     def parseUnaryOperators(seq):
         ed = ExprDict()
         unaryOperatorExpr = ed["unaryOperatorExpr"] = Or(recurseApplyAndParam(M("unaryOperatorExpr")),
-            BtN('apply', (N("plus") | N("ques") | N("star") | N('xcp') | N('req') | N('tilde')) + M("unaryOperatorExpr")),
-            N('daller') + N('id') + (N('match_eq') | N('scan_eq')), # special form
+            BtN('apply', (N("plus") | N("ques") | N("star") | N('scan') | N('xcp') | N('req') | N('tilde')) + M("unaryOperatorExpr")),
+            N('daller') + N('id') + (N('matches') | N('scan_eq')), # special form
             BtN('apply', IN("expand") + Drop(N('daller')) + N('id')),
             N('daller') + ErrorExpr('operator $ is only applicable to a node'),
             A())
@@ -139,8 +138,8 @@ def parse_to_ast(s, verboseOutput=None):
         ed = ExprDict()
         def aop(opName): return BtN('apply', IN(opName) + N('id') + Drop(N(opName)) + M("assignExpr"))
         def aopwd(opName): return BtN('apply', IN(opName) + IN('expand') + Drop(N('daller')) + N('id') + Drop(N(opName)) + M("assignExpr"))
-        term = ed["term"] = recurseApplyAndParam(M("assignExpr")) | XtA((N('match_eq') | N('scan_eq') | N('assign_subtree')))
-        assignExpr = ed["assignExpr"] = aopwd('match_eq') | aopwd('scan_eq') | aop('match_eq') | aop('scan_eq') | aop('insert_subtree') | term
+        term = ed["term"] = recurseApplyAndParam(M("assignExpr")) | XtA((N('matches') | N('scan_eq') | N('assign_subtree')))
+        assignExpr = ed["assignExpr"] = aopwd('matches') | aopwd('scan_eq') | aop('matches') | aop('scan_eq') | aop('insert_subtree') | term
         return __scan_and_fold(seq, assignExpr, "Can't parse binary operator ASSIGN")
     seq = parseBinaryOperatorAssign(seq)
     verbosePrintSeq(seq)    
@@ -274,7 +273,7 @@ def convert_to_expression_object(seq):
     nameToRep = { 'ques': Repeat.ZeroOrOne, 'star': Repeat.ZeroOrMore, 'plus': Repeat.OneOrMore }
     nameToOrSeq = { 'or': Or.build, 'seq': Seq.build }
     #nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
-    nameToPreqXcep = { 'req': Req, 'xcp': Xcp, 'tilde': XcpThenAny }
+    nameToBuiltinFunc = { 'req': Req, 'xcp': Xcp, 'tilde': XcpThenAny, 'scan' : Scan }
     
     literalExprPool = {}
     
@@ -286,25 +285,15 @@ def convert_to_expression_object(seq):
         seq0, seq1 = seq[0], seq[1]
         if seq0 == 'apply':
             seq1NodeName = seq1[0] if len(seq1) >= 1 else None
-            if seq1NodeName == 'match_eq':
+            if seq1NodeName == 'matches':
                 is_flatten = False
                 if nodeNameIn(seq[2], ( 'expand', )):
                     is_flatten = True
                     del seq[2]; len_seq = len(seq)
-                if len_seq != 4: raise CompileError("Invalid match= expr", seq1)
+                if len_seq != 4: raise CompileError("Invalid :: expr", seq1)
                 label = id2Label(seq[2])
-                if not label: raise CompileError("match= requires an identifier", seq[2])
+                if not label: raise CompileError("operator :: requires an identifier", seq[2])
                 return NM(label, cnv_i(seq[3]), newLabel=(FLATTEN if is_flatten else None))
-            elif seq1NodeName == 'scan_eq':
-                is_flatten = False
-                if nodeNameIn(seq[2], ( 'expand', )):
-                    is_flatten = True; del seq[2]
-                    len_seq = len(seq)
-                if len_seq != 4: raise CompileError("Invalid scan= expr", seq1)
-                label = id2Label(seq[2])
-                if not label: raise CompileError("can= requires an identifier", seq[2])
-                innerExpr = cnv_i(seq[3])
-                return NM(label, S(innerExpr), newLabel=(FLATTEN if is_flatten else None))
             elif seq1NodeName == 'insert_subtree':
                 if len_seq == 3:
                     label = id2Label(seq[2])
@@ -330,10 +319,10 @@ def convert_to_expression_object(seq):
                 label = id2Label(seq[2])
                 if not label: raise CompileError("Expand($) requires an identifier", seq[2])
                 return N(label, newLabel=FLATTEN)
-            elif seq1NodeName in nameToPreqXcep:
+            elif seq1NodeName in nameToBuiltinFunc:
                 if len_seq != 3: raise CompileError("Invalid req/xcp/~ expr", seq1)
                 r = cnv_i(seq[2])
-                return nameToPreqXcep[seq1[0]](r)
+                return nameToBuiltinFunc[seq1[0]](r)
             elif seq1NodeName in nameToRep:
                 if len_seq != 3: raise CompileError("Invalid Repeat expr", seq1)
                 r = cnv_i(seq[2])

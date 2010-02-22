@@ -50,16 +50,16 @@ class TestPytorqyComileAndInterpret(unittest.TestCase):
             ( 'gsub', r'(v <- +(r"^\d" | ".")) | (null <- +(" " | "\t"));' ),
             ( 'gsub', r'v <- (null <- "("), +(&0 | xcp("(" | ")"), any), (null <- ")");' ),
             ( 'match', r"""
-                ?(v <- (u_op <- "+" | "-"), (v scan= &0)), 
+                ?(v <- (u_op <- "+" | "-"), (v :: scan(&0))), 
                 *(
-                    (v scan= &0), *("+" | "-") 
-                    | (v <- (u_op <- "+" | "-"), (v scan= &0))
+                    (v :: scan(&0)), *("+" | "-") 
+                    | (v <- (u_op <- "+" | "-"), (v :: scan(&0)))
                     | any
                 );
             """ ),
-            ( 'gsub', r'(v <- (v scan= &0), +((b_op <- "**"), (v scan= &0))) | (v scan= &0);' ),
-            ( 'gsub', r'(v <- (v scan= &0), +((b_op <- "*" | "/"), (v scan= &0))) | (v scan= &0);' ),
-            ( 'gsub', r'(v <- (v scan= &0), +((b_op <- "+" | "-"), (v scan= &0))) | (v scan= &0);' ),
+            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "**"), (v :: scan(&0)))) | (v :: scan(&0));' ),
+            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "*" | "/"), (v :: scan(&0)))) | (v :: scan(&0));' ),
+            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "+" | "-"), (v :: scan(&0)))) | (v :: scan(&0));' ),
         ]
         exprs = compile_commands(commands)
         
