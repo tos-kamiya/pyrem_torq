@@ -1,0 +1,12 @@
+Pytorqy changelog
+==================
+
+Known Bugs
+  - None.
+
+0.2 2010/02/22
+  - Changed internal data strucutres for optimization.
+
+0.1 2009/12/17
+  - The initial version.
+
