@@ -11,7 +11,7 @@ class Literal(TorqExpression):
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         if self.__string == lookAheadString:
-            return 1, [ lookAheadString ], ()
+            return 1, ( lookAheadString, ), ()
         #return None
     
     def __eq__(self, right): return isinstance(right, Literal) and self.__string == right.__string
@@ -39,7 +39,7 @@ class AnyLiteral(TorqExpression): # singleton
     __slots__ = [ ]
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        return 1, [ lookAheadString ], ()
+        return 1, ( lookAheadString, ), ()
     
     def __eq__(self, right): return isinstance(right, AnyLiteral)
     def __repr__(self): return "AnyLiteral()"
@@ -63,7 +63,7 @@ class LiteralClass(TorqExpression):
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         if lookAheadString in self.__stringSet: 
-            return 1, [ lookAheadString ], ()
+            return 1, ( lookAheadString, ), ()
         #return None
     
     def __eq__(self, right): return isinstance(right, LiteralClass) and self.__strings == right.__strings
@@ -113,7 +113,7 @@ class Rex(TorqExpression):
         
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         if self.__expression_match(lookAheadString):
-            return 1, [ lookAheadString ], ()
+            return 1, ( lookAheadString, ), ()
         #return None
     
     def __eq__(self, right): return isinstance(right, Rex) and \

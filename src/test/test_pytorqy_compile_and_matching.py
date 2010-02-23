@@ -57,9 +57,9 @@ class TestPytorqyComileAndInterpret(unittest.TestCase):
         seq = [ 'code' ]; seq.extend(split_to_strings_iter("+1.0 + 2 * ((3 - 4) / -.5) ** 6"))
         for exprIndex, expr in enumerate(exprs):
             print "exprIndex=", exprIndex, "cur seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
-            posDelta, outSeq, dropSeq = expr.match(seq, 1)
-            self.assertEqual(1 + posDelta, len(seq))
-            seq = [ seq[0] ] + outSeq
+            newSeq = expr.parse(seq)
+            self.assertTrue(newSeq, None)
+            seq = newSeq
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
         
     def test3rd(self):
@@ -120,9 +120,9 @@ int main(int argc, char *argv[])
         seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
         
         for expr in exprs:
-            posDelta, outSeq, dropSeq = expr.match(seq, 1)
-            self.assertEqual(1 + posDelta, len(seq))
-            seq = [ seq[0] ] + outSeq
+            newSeq = expr.parse(seq)
+            self.assertTrue(newSeq, None)
+            seq = newSeq
         
         foundAnd, foundOr = False, False
         for item in seq:
@@ -143,9 +143,7 @@ int main(int argc, char *argv[])
         inputText = inputText.decode(sys.getfilesystemencoding())
         seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
         
-        posDelta, outSeq, dropSeq = exprs[0].match(seq, 1)
-        self.assertEqual(1 + posDelta, len(seq))
-        seq = [ seq[0] ] + outSeq
+        seq = exprs[0].parse(seq)
         self.assertEqual(seq[1], [ 'wordlike', u'argv' ])
         
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
@@ -162,9 +160,9 @@ int main(int argc, char *argv[])
         seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
         
         for expr in exprs:
-            posDelta, outSeq, dropSeq = expr.match(seq, 1)
-            self.assertEqual(1 + posDelta, len(seq))
-            seq = [ seq[0] ] + outSeq
+            newSeq = exprs[0].parse(seq)
+            self.assertTrue(newSeq)
+            seq = newSeq
         
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
 
@@ -186,9 +184,7 @@ int main(int argc, char *argv[])
             inputText = inputText.decode(sys.getfilesystemencoding())
             seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText, pat))
             
-            posDelta, outSeq, dropSeq = exprs[0].match(seq, 1)
-            self.assertEqual(1 + posDelta, len(seq))
-            seq = [ seq[0] ] + outSeq
+            seq = exprs[0].parse(seq)
             self.assertEqual(seq[0], 'code')
             self.assertEqual(seq[1][0], 'l_float')
             self.assertEqual(u"".join(seq[1][1:]), inputText)

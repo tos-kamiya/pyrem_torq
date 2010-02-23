@@ -40,8 +40,8 @@ class TorqExpression(object):
         assert upper is None or lower <= upper
         return Repeat.build(self, lower, upper)
             
-    def search(self, inpSeq, inpPos):
-        return Search.build(self).match(inpSeq, inpPos)
+    #def search(self, inpSeq, inpPos):
+    #    return Search.build(self).match(inpSeq, inpPos)
     
     def match(self, inpSeq, inpPos):
         assert inpPos >= 1
@@ -61,8 +61,10 @@ class TorqExpression(object):
     def parse(self, inpSeq, dropSeq=None):
         posDelta, outSeq, _dropSeq = self.match(inpSeq, 1)
         if 1 + posDelta != len(inpSeq): return None
-        if isinstance(dropSeq, list): dropSeq.append(_dropSeq)
-        return [ inpSeq[0] ] + outSeq
+        if dropSeq is not None: dropSeq.append(_dropSeq)
+        newSeq = [ inpSeq[0] ]
+        newSeq.extend(outSeq)
+        return newSeq
     
     def _match_node(self, inpSeq, inpPos, lookAhead):
         pass
