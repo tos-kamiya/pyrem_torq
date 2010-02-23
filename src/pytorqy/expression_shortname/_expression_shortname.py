@@ -2,7 +2,7 @@ import pytorqy.expression
 
 A = pytorqy.expression.Any.build
 Q = pytorqy.expression.Req.build
-S = pytorqy.expression.Scan.build
+S = pytorqy.expression.Search.build
 X = pytorqy.expression.Xcp.build
 XtA = pytorqy.expression.XcpThenAny.build
 

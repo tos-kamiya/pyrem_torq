@@ -14,20 +14,20 @@ def _parsing_expr_iter():
     # atomic
     parenv = BtN('v', Drop(L('(')) + [0,]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
     numberv = BtN('v', Rex(r"^(\d|[.])"))
-    yield Scan(to_recursive(parenv | numberv | Any()))
+    yield Search(to_recursive(parenv | numberv | Any()))
 
     # unary +,-
-    vscan = NM('v', Scan(M('0')))
-    signv = BtN('v', (LC('+-')) + vscan)
-    yield to_recursive([0,1]*signv + [0,]*((vscan + LC('+-')) | signv | Any()))
+    vSearch = NM('v', Search(M('0')))
+    signv = BtN('v', (LC('+-')) + vSearch)
+    yield to_recursive([0,1]*signv + [0,]*((vSearch + LC('+-')) | signv | Any()))
     
     # multiply, divide
-    vscan = NM('v', Scan(M('0')))
-    yield Scan(to_recursive(BtN('v', vscan + [1,]*(LC('*/%') + vscan))))
+    vSearch = NM('v', Search(M('0')))
+    yield Search(to_recursive(BtN('v', vSearch + [1,]*(LC('*/%') + vSearch))))
 
     # add, sub
-    vscan = NM('v', Scan(M('0')))
-    yield Scan(to_recursive(BtN('v', vscan + [1,]*(LC('+-') + vscan))))
+    vSearch = NM('v', Search(M('0')))
+    yield Search(to_recursive(BtN('v', vSearch + [1,]*(LC('+-') + vSearch))))
 
 parsing_exprs = list(_parsing_expr_iter())
 

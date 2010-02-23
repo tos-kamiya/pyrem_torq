@@ -262,8 +262,8 @@ class TestPytorqyExpression(unittest.TestCase):
         self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
                 ( [], [ 'a', 'b', 'c' ], False ))
     
-    def testScan(self):
-        expr = Scan(Seq(InsertNode("here"), Literal("a")))
+    def testSearch(self):
+        expr = Search(Seq(InsertNode("here"), Literal("a")))
         seq = [ 'text', "a", "b", "c", "a" ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 4)
@@ -274,8 +274,8 @@ class TestPytorqyExpression(unittest.TestCase):
         self.assertEqual(posDelta, 4)
         self.assertEqual(outSeq, [ [ "here" ], "a", "b", "c", [ "here" ], "a" ])
         
-    def testScan2(self):
-        expr = Scan(InsertNode("here"))
+    def testSearch2(self):
+        expr = Search(InsertNode("here"))
         seq = [ 'text', "a", "b", "c" ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 3)

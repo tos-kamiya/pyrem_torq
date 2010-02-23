@@ -28,19 +28,19 @@ class TestPytorqyComile(unittest.TestCase):
         compiling('text :: (v <- +(r"^\d" | ".")) | (null <- +(" " | ">"));')
         
     def test2nd(self):
-        compiling('text :: (v <- (null <- "("), +(&0 | xcp("(" | ")"), any), (null <- ")"));')
+        compiling('text :: (v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));')
     
     def test3rd(self):
-        compiling('text :: ?(v <- (u_op <- "+" | "-"), (v :: scan(&0))), *(xcp(v), any, ?(v <- (u_op <- "+" | "-"), (v :: scan(&0))) | (v :: scan(&0)));')
+        compiling('text :: ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), *(xcp(v), any, ?(v <- (u_op <- "+" | "-"), (v :: ~@0)) | (v :: ~@0));')
         
     def test4th(self):
-        compiling('text :: scan((v <- (v :: scan(&0)), +((b_op <- "**"), (v :: scan(&0)))) | (v :: scan(&0)));')
+        compiling('text :: ~(v <- (v :: ~@0), +((b_op <- "**"), (v :: ~@0))) | (v :: ~@0);')
     
     def test5th(self):
-        compiling('text :: scan((v <- (v :: scan(&0)), +((b_op <- "*" | "/"), (v :: scan(&0)))) | (v :: scan(&0)));')
+        compiling('text :: ~(v <- (v :: ~@0), +((b_op <- "*" | "/"), (v :: ~@0))) | (v :: ~@0);')
 
     def test6th(self):
-        compiling('((v :: scan(&0)));')
+        compiling('v :: ~@0;')
     
     def test7th(self):
         exprStr = """
@@ -58,27 +58,37 @@ class TestPytorqyComile(unittest.TestCase):
 #        self.assertTrue(exprs == exprs2)
 
     def test9th(self):
-        exprStr = "(hoge <-), $huga, ($boo :: a), ($foo :: scan(b));"
+        exprStr = "(hoge <-), <>huga, (<>boo :: a), (<>foo :: ~b);"
         compiling(exprStr)
     
     def test10th(self):
-        compiling('text :: scan(?("a" | &0));')
+        compiling('text :: ~?("a" | @0);')
     
     def test11th(self):
-        compiling('text :: scan(eof);')
+        compiling('text :: ~eof;')
     
     def test12th(self):
-        compiling('text :: scan(~(eof) | *~(eof));')
+        compiling('text :: ~(any^(eof, a) | *any^(eof));')
     
     def test13th(self):
-        compiling('text :: scan(a <- ($b | $c));')
+        compiling('text :: ~(a <- (<>b | <>c));')
         
     def test14th(self):
-        exprs = compiling('text :: scan(ri"[a-z]" | i"f");')
+        exprs = compiling('text :: ~(ri"[a-z]" | i"f");')
     
     def test15th(self):
-        exprs = compiling("hoge <- $fuga;")
+        exprs = compiling("hoge <- <>fuga;")
         assert len(exprs) == 1
+    
+    def test16th(self):
+        exprStr1 = "xcp a | b;"
+        exprs1 = compiling(exprStr1)
+        exprStr2 = "xcp(a | b);"
+        exprs2 = compiling(exprStr2)
+        exprStr3 = "(xcp a) | b;"
+        exprs3 = compiling(exprStr3)
+        self.assertNotEqual(exprs1, exprs2)
+        self.assertEqual(exprs1, exprs3)
     
 if __name__ == '__main__':
     unittest.main()

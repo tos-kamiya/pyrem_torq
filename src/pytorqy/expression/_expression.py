@@ -40,6 +40,9 @@ class TorqExpression(object):
         assert upper is None or lower <= upper
         return Repeat.build(self, lower, upper)
             
+    def search(self, inpSeq, inpPos):
+        return Search.build(self).match(inpSeq, inpPos)
+    
     def match(self, inpSeq, inpPos):
         assert inpPos >= 1
         len_inpSeq = len(inpSeq)
@@ -376,8 +379,8 @@ class _RepeatZeroOrOne(Repeat):
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         return self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) or _zeroLengthReturnValue
 
-class Scan(TorqExpressionWithExpr):
-    # Scan(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
+class Search(TorqExpressionWithExpr):
+    # Search(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
     # The difference is: when expr matches an empty sequence at some position of inpSeq,
     # the former matches the entire input sequence. the latter matches the empty sequence.
     
@@ -427,7 +430,7 @@ class Scan(TorqExpressionWithExpr):
             return r[0], r[1], True
     
     @staticmethod
-    def build(expr): return Scan(expr)
+    def build(expr): return Search(expr)
 
 class InterpretError(StandardError):
     def __init__(self, message):

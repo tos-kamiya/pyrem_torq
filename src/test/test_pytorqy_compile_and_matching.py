@@ -7,8 +7,7 @@ import pytorqy.treeseq
 
 import unittest
 
-def to_gsublike_expr(expr):
-    return pytorqy.expression.Scan.build(expr)
+to_gsublike_expr = pytorqy.expression.Search.build
 
 def my_compile(exprStr, recursionAtMarker0=True):
     try:
@@ -25,43 +24,35 @@ def my_compile(exprStr, recursionAtMarker0=True):
     
     return exprs
 
-def compile_commands(commands):
+def compile_exprs(exprStrs):
     exprs = []
-    for cmd in commands:
-        option, exprStr = cmd
-        
+    for exprStr in exprStrs:
         expr = pytorqy.compile.compile(exprStr, recursionAtMarker0=True)
         #expr = my_compile(exprStr, recursiionAtMarker0=True)
         
         assert len(expr) == 1
         expr = expr[0]
-        if option == 'gsub':
-            expr = to_gsublike_expr(expr)
-        elif option == 'match':
-            pass
-        else:
-            assert False
         exprs.append(expr)
     return exprs
 
 class TestPytorqyComileAndInterpret(unittest.TestCase):
     def test1st(self):
-        commands = [ 
-            ( 'gsub', r'(v <- +(r"^\d" | ".")) | (null <- +(" " | "\t"));' ),
-            ( 'gsub', r'v <- (null <- "("), +(&0 | xcp("(" | ")"), any), (null <- ")");' ),
-            ( 'match', r"""
-                ?(v <- (u_op <- "+" | "-"), (v :: scan(&0))), 
+        exprStrs = [ 
+            r'~((v <- +(r"^\d" | ".")) | (null <- +(" " | "\t")));',
+            r'~(v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));',
+            r"""
+                ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), 
                 *(
-                    (v :: scan(&0)), *("+" | "-") 
-                    | (v <- (u_op <- "+" | "-"), (v :: scan(&0)))
+                    (v :: ~@0), *("+" | "-") 
+                    | (v <- (u_op <- "+" | "-"), (v :: ~@0))
                     | any
                 );
-            """ ),
-            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "**"), (v :: scan(&0)))) | (v :: scan(&0));' ),
-            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "*" | "/"), (v :: scan(&0)))) | (v :: scan(&0));' ),
-            ( 'gsub', r'(v <- (v :: scan(&0)), +((b_op <- "+" | "-"), (v :: scan(&0)))) | (v :: scan(&0));' ),
+            """,
+            r'~((v <- (v :: ~@0), +((b_op <- "**"), (v :: ~@0))) | (v :: ~@0));',
+            r'~((v <- (v :: ~@0), +((b_op <- "*" | "/"), (v :: ~@0))) | (v :: ~@0));', 
+            r'~((v <- (v :: ~@0), +((b_op <- "+" | "-"), (v :: ~@0))) | (v :: ~@0));',
         ]
-        exprs = compile_commands(commands)
+        exprs = compile_exprs(exprStrs)
         
         seq = [ 'code' ]; seq.extend(split_to_strings_iter("+1.0 + 2 * ((3 - 4) / -.5) ** 6"))
         for exprIndex, expr in enumerate(exprs):
@@ -72,12 +63,12 @@ class TestPytorqyComileAndInterpret(unittest.TestCase):
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
         
     def test3rd(self):
-        commands = [
-            ( 'gsub', r'eol <- "\t" | "\f" | "\v" | "\r" | "\n";' ),
-            ( 'gsub', r'comment <- "/", "*", *(+"*", (xcp("/"), any) | xcp("*"), any), +"*", "/";' ),
-            ( 'gsub', r'comment <- "/", "/", *(xcp(eol), any);' ),
+        exprStrs = [
+            r'~(eol <- "\t" | "\f" | "\v" | "\r" | "\n");',
+            r'~(comment <- "/", "*", *(+"*", (xcp("/"), any) | xcp("*"), any), +"*", "/");',
+            r'~(comment <- "/", "/", *(xcp(eol), any));',
         ]
-        exprs = compile_commands(commands)
+        exprs = compile_exprs(exprStrs)
         
         inputText = """
 #include <stdio.h> // import printf()
@@ -107,7 +98,7 @@ int main(int argc, char *argv[])
         L = pytorqy.expression.Literal.build
         A = pytorqy.expression.Any.build
         Q = pytorqy.expression.Req.build
-        S = pytorqy.expression.Scan.build
+        S = pytorqy.expression.Search.build
         
         eolExpr = BtN('eol', L("\r\n") | L("\n") | L("\r"))
         expr = S(eolExpr) + Q(pytorqy.expression.EndOfNode()) + IN('eof')
@@ -120,9 +111,9 @@ int main(int argc, char *argv[])
     
     def test5th(self):
         atoz = 'r"^[a-z]"'
-        commands = [ ( 'gsub', r'req(%(atoz)s), ((op_logical_and <- "and") | (op_logical_or <- "or")), xcp(%(atoz)s);' % { 'atoz': atoz } ) ]
+        exprStrs = [ r'~(req(%(atoz)s), ((op_logical_and <- "and") | (op_logical_or <- "or")), xcp(%(atoz)s));' % { 'atoz': atoz } ]
         
-        exprs = compile_commands(commands)
+        exprs = compile_exprs(exprStrs)
         
         inputText = r'if (x and y or z) printf("hello\n");'
         inputText = inputText.decode(sys.getfilesystemencoding())
@@ -144,9 +135,8 @@ int main(int argc, char *argv[])
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
     
     def test6th(self):
-        wordLike = r'wordlike <- "_", *(r"^[a-zA-Z]" | r"\d" | "_") | r"^[a-zA-Z]", *(r"^[a-zA-Z]" | r"\d" | "_");'
-        commands = [ ('gsub', wordLike ) ]
-        exprs = compile_commands(commands)
+        searchWordLike = r'~(wordlike <- "_", *(r"^[a-zA-Z]" | r"\d" | "_") | r"^[a-zA-Z]", *(r"^[a-zA-Z]" | r"\d" | "_"));'
+        exprs = compile_exprs([ searchWordLike ])
         assert len(exprs) == 1
         
         inputText = r'argv[0];'
@@ -161,11 +151,10 @@ int main(int argc, char *argv[])
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
         
     def test7th(self):
-        wordLike = r'word <- ("_", *("_" | r"^[a-zA-Z]" | r"^\d") | r"^[a-zA-Z]", *("_" | r"^[a-zA-Z]" | r"^\d"));'
-        idMake = r'id <- $word;'
+        searchWordLike = r'~(word <- ("_", *("_" | r"^[a-zA-Z]" | r"^\d") | r"^[a-zA-Z]", *("_" | r"^[a-zA-Z]" | r"^\d")));'
+        searchIdMake = r'~(id <- <>word);'
         
-        commands = [ ( 'gsub', wordLike ), ( 'gsub', idMake ) ]
-        exprs = compile_commands(commands)
+        exprs = compile_exprs([ searchWordLike, searchIdMake ])
         assert len(exprs) == 2
 
         inputText = r'argv[0];'
@@ -180,14 +169,14 @@ int main(int argc, char *argv[])
         print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
 
     def test8th(self):
-        floatingPointLitearal = r"""
-        l_float <- "0", (
-            ri"^x[a-f0-9]+p\d+$" | ri"^x[a-f0-9]+p$", ("-" | "+"), r"^\d"
-            | ri"^x[a-f0-9]+$", ".", *(ri"^[a-f0-9]+$" | r"^\d"), ?(ri"^[a-f0-9]*p\d+$" | ri"^[a-f0-9]*p$", ("-" | "+"), r"^\d")
-        ), ?i"l";
-"""
-        commands = [ ( 'gsub', floatingPointLitearal ) ]
-        exprs = compile_commands(commands)
+        searchFloatingPointLitearal = r"""~(
+            l_float <- "0", (
+                ri"^x[a-f0-9]+p\d+$" | ri"^x[a-f0-9]+p$", ("-" | "+"), r"^\d"
+                | ri"^x[a-f0-9]+$", ".", *(ri"^[a-f0-9]+$" | r"^\d"), ?(ri"^[a-f0-9]*p\d+$" | ri"^[a-f0-9]*p$", ("-" | "+"), r"^\d")
+            ), ?i"l"
+        );
+        """
+        exprs = compile_exprs([ searchFloatingPointLitearal ])
         assert len(exprs) == 1
         
         pat = re.compile(r"\d+|[a-zA-Z_][a-zA-Z_0-9]*|[ \t]+|\r\n|.", re.DOTALL | re.IGNORECASE)
