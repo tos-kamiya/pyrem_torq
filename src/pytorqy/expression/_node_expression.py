@@ -224,7 +224,7 @@ class NodeClass(TorqExpression):
         return isinstance(right, NodeClass) and self.__labels == right.__labels and \
                 self.__newLabel == right.newLabel
     
-    def __repr__(self): return "NodeClass(%s,newLabel=%s)" % ( ",".join(repr(lbl) for lbl in sorted(self.__labels)), repr(self.__newLabel) )
+    def __repr__(self): return "NodeClass([%s],newLabel=%s)" % ( ",".join(repr(lbl) for lbl in sorted(self.__labels)), repr(self.__newLabel) )
     def __hash__(self): return hash("NodeClass") + sum(map(hash, self.__labels)) + hash(self.__newLabel)
     
     def required_node_literal_epsilon(self):
@@ -345,7 +345,7 @@ class Drop(TorqExpressionWithExpr):
     def __make_return_value(self, r):
         if r is None: return None
         p, o, d = r
-        dropSeq = d if _islist(d) else list(d)
+        dropSeq = [] if not d else d if _islist(d) else list(d)
         dropSeq.extend(o)
         return p, (), dropSeq
     

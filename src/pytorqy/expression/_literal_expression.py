@@ -67,14 +67,14 @@ class LiteralClass(TorqExpression):
         #return None
     
     def __eq__(self, right): return isinstance(right, LiteralClass) and self.__strings == right.__strings
-    def __repr__(self): return "LiteralClass(%s)" % (",".join(repr(s) for s in self.__strings))
+    def __repr__(self): return "LiteralClass([%s])" % (",".join(repr(s) for s in self.__strings))
     def __hash__(self): return hash("LiteralClass") + sum(map(hash, self.__strings))
     
     def extractStrings(self):
         return sorted(self.__strings)
     
     def required_node_literal_epsilon(self):
-        return (), self.__strings, False
+        return (), tuple(sorted(self.__strings)), False
             
     def or_merged(self, other):
         if isinstance(other, AnyLiteral):
