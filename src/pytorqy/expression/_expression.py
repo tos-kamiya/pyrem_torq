@@ -40,9 +40,6 @@ class TorqExpression(object):
         assert upper is None or lower <= upper
         return Repeat.build(self, lower, upper)
             
-    #def search(self, inpSeq, inpPos):
-    #    return Search.build(self).match(inpSeq, inpPos)
-    
     def match(self, inpSeq, inpPos):
         assert inpPos >= 1
         len_inpSeq = len(inpSeq)
@@ -203,7 +200,7 @@ def _seqflatener(exprs):
         else: yield e
 
 class Seq(TorqExpression):
-    __slots__ = [ '__exprs', '__expr0' ]
+    __slots__ = [ '__exprs', '__expr0', '__rnle', ]
     
     def getexprs(self): return self.__exprs
     exprs = property(getexprs)
@@ -212,12 +209,25 @@ class Seq(TorqExpression):
         self.__exprs = tuple(exprs)
         for expr in self.__exprs: assert isinstance(expr, TorqExpression)
         self.__expr0 = self.__exprs[0] if self.__exprs else Epsilon()
-    
+        
     def expr_iter(self):
         for e in self.__exprs: yield e
         
     def __init__(self, *exprs):
         self._set_exprs(exprs)
+        self.__set_rnle()
+        
+    def __set_rnle(self):
+        ns, ls, epsilon = [], [], True
+        for r in (expr.required_node_literal_epsilon() for expr in self.exprs):
+            if r is None: 
+                self.__rnle = None
+                return
+            ns.extend(r[0]); ls.extend(r[1])
+            if not r[2]: 
+                epsilon = False
+                break # for r
+        self.__rnle = sorted(set(ns)), sorted(set(ls)), epsilon
     
     def __match_tail(self, inpSeq, inpPos, r):
         if r is None: return None
@@ -251,22 +261,13 @@ class Seq(TorqExpression):
             r = expr._match_eon(inpSeq, inpPos, lookAheadDummy)
             if r is None: return None
             p, o, d = r
-            assert p == 0
-            assert not d
+            #assert p == 0
+            #assert not d
             outSeq.extend(o)
         return 0, outSeq, ()
 
     def required_node_literal_epsilon(self):
-        if not self.__exprs:
-            return (), (), True
-        ns, ls, epsilon = [], [], True
-        for r in (expr.required_node_literal_epsilon() for expr in self.exprs):
-            if r is None: return None
-            ns.extend(r[0]); ls.extend(r[1])
-            if not r[2]: 
-                epsilon = False
-                break # for r
-        return sorted(set(ns)), sorted(set(ls)), epsilon
+        return self.__rnle
             
     @staticmethod
     def build(*exprs):
@@ -287,13 +288,16 @@ class Seq(TorqExpression):
         return Seq(*mergedExprs)
 
 class Repeat(TorqExpressionWithExpr):
-    __slots__ = [ '__lowerLimit', '__upperLimit' ]
+    __slots__ = [ '__lowerLimit', '__upperLimit', '__rnle' ]
     
     def __init__(self, expr, lowerLimit, upperLimit):
         assert lowerLimit >= 0
         assert upperLimit is None or upperLimit >= lowerLimit
         self.__lowerLimit, self.__upperLimit = lowerLimit, upperLimit
         self._set_expr(expr)
+        rnle = self.expr.required_node_literal_epsilon()
+        self.__rnle = None if rnle is None else \
+                ( rnle[0], rnle[1], self.__lowerLimit == 0 or rnle[2] )
         
     def _match_node(self, inpSeq, inpPos, lookAhead):
         len_inpSeq = len(inpSeq)
@@ -323,8 +327,8 @@ class Repeat(TorqExpressionWithExpr):
             r = self._expr._match_eon(inpSeq, inpPos, None)
             if r is None: return None
             p, o, d = r
-            assert p == 0
-            assert not d
+            #assert p == 0
+            #assert not d
             if not _islist(o): o = list(o)
             o_xt(o * -count)
         return curInpPos - inpPos, outSeq, dropSeq
@@ -336,8 +340,8 @@ class Repeat(TorqExpressionWithExpr):
         if r is None:
             return _zeroLengthReturnValue if self.__lowerLimit == 0 else None
         p, o, d = r
-        assert p == 0
-        assert not d
+        #assert p == 0
+        #assert not d
         if self.__lowerLimit != 0:
             if not _islist(o): o = list(o)
             return 0, o * self.__lowerLimit, ()
@@ -353,14 +357,7 @@ class Repeat(TorqExpressionWithExpr):
     def __hash__(self): return hash("Repeat") + hash(self.expr) + hash(self.__lowerLimit) + hash(self.__upperLimit)
 
     def required_node_literal_epsilon(self):
-        r = self.expr.required_node_literal_epsilon()
-        if self.__lowerLimit >= 1:
-            return r
-        else:
-            if r is None: 
-                return None
-            else: 
-                return r[0], r[1], True
+        return self.__rnle
     
     @staticmethod
     def ZeroOrOne(expr): return _RepeatZeroOrOne(expr)
@@ -374,10 +371,13 @@ class Repeat(TorqExpressionWithExpr):
     @staticmethod
     def build(expr, lowerLimit, upperLimit):
         LU = lowerLimit, upperLimit
-        if LU == (0, 1): return _RepeatZeroOrOne(expr)
-        elif LU == (0, None): return Repeat.ZeroOrMore(expr)
-        elif LU == (1, None): return Repeat.OneOrMore(expr)
-        else: return Repeat(expr, lowerLimit, upperLimit)
+        if LU == (0, 0): return Epsilon()
+        else:
+            if isinstance(expr, Search): return expr
+            elif LU == (0, 1): return Repeat.ZeroOrOne(expr)
+            elif LU == (0, None): return Repeat.ZeroOrMore(expr)
+            elif LU == (1, None): return Repeat.OneOrMore(expr)
+            else: return Repeat(expr, lowerLimit, upperLimit)
 
 class _RepeatZeroOrOne(Repeat):
     __slots__ = [ ]
@@ -399,11 +399,14 @@ class Search(TorqExpressionWithExpr):
     # The difference is: when expr matches an empty sequence at some position of inpSeq,
     # the former matches the entire input sequence. the latter matches the empty sequence.
     
-    __slots__ = [ '__reqLabelSet', '__reqStringSet' ]
+    __slots__ = [ '__rnle' ]
     
     def __init__(self, expr):
         self._set_expr(expr)
-        
+        rnle = expr.required_node_literal_epsilon()
+        self.__isTargetLabel = self.__isTargetString = None
+        self.__rnle = None if rnle is None else ( rnle[0], rnle[1], True )
+    
     def _match_node(self, inpSeq, inpPos, lookAhead):
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos
@@ -424,8 +427,8 @@ class Search(TorqExpressionWithExpr):
             r = self._expr._match_eon(inpSeq, curInpPos, None)
             if r is not None:
                 p, o, d = r
-                assert p == 0
-                assert not d
+                #assert p == 0
+                #assert not d
                 o_xt(o)
         return curInpPos - inpPos, outSeq, dropSeq
     
@@ -435,11 +438,7 @@ class Search(TorqExpressionWithExpr):
         return self._expr._match_eon(inpSeq, inpPos, lookAhead)
     
     def required_node_literal_epsilon(self):
-        r = self.expr.required_node_literal_epsilon()
-        if r is None: 
-            return None
-        else: 
-            return r[0], r[1], True
+        return self.__rnle
     
     @staticmethod
     def build(expr): 

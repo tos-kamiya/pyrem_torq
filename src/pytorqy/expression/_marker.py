@@ -97,7 +97,7 @@ def assign_marker_expr(expr, *args):
         replacedMarkers.append(e)
     return replacedMarkers
     
-def replace_marker_expr(expr, *args):
+def update_marker_expr(expr, *args):
     replaceTable, targetMarkers = __lookup_replaces(expr, *args)
     replacedMarkers = []        
     for e in targetMarkers:

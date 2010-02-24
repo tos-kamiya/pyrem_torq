@@ -256,7 +256,21 @@ def convert_literal_to_expression_object(s0):
         evaledS = "".join(parts)
         return L(evaledS)
 
-def convert_to_expression_object(seq):
+def convert_to_expression_object(seq, replaces=None):
+    if replaces:
+        if isinstance(replaces, ( list, tuple )):
+            assert len(replaces) == 2
+            assert isinstance(replaces[1], TorqExpression)
+            replaceTable = { replaces[0]:replaces[1] }
+        else:
+            for label, expr in replaces.iteritems():
+                if not isinstance(expr, TorqExpression):
+                    print "here"
+                assert isinstance(expr, TorqExpression)
+            replaceTable = replaces
+    else:
+        replaceTable = {}
+    
     def nodeNameIn(seq, names): 
         return len(seq) >= 1 and seq[0] in names
     alpha_Set = frozenset(list(string.ascii_letters) + [ '_' ])
@@ -351,6 +365,9 @@ def convert_to_expression_object(seq):
         elif seq0 == 'marker':
             label = marker2Label(seq)
             if not label: raise CompileError("Invalid Marker", seq0)
+            r = replaceTable.get(label)
+            if r is not None:
+                return r
             return Marker(label)
         elif seq0 == 'string_literal':
             if not(len_seq >= 2): raise CompileError("Empty Literal", seq0)
@@ -377,13 +394,13 @@ def convert_to_expression_object(seq):
     
     return r
 
-def compile(src, recursionAtMarker0=True):
+def compile(src, recursionAtMarker0=True, replaces=None):
     try:
         seq = parse_to_ast(src)
     except InterpretError as e:
         raise CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     
-    exprs = convert_to_expression_object(seq)
+    exprs = convert_to_expression_object(seq, replaces=replaces)
     
     if recursionAtMarker0:
         for expr in exprs:

@@ -342,21 +342,24 @@ class Drop(TorqExpressionWithExpr):
     def __init__(self, expr):
         self._set_expr(expr)
     
-    def __make_return_value(self, r):
+    @staticmethod
+    def __make_return_value(r):
         if r is None: return None
         p, o, d = r
-        dropSeq = [] if not d else d if _islist(d) else list(d)
+        if not d: return p, (), o
+        if not o: return p, (), d
+        dropSeq = d if _islist(d) else list(d)
         dropSeq.extend(o)
         return p, (), dropSeq
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return self.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
+        return Drop.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        return self.__make_return_value(self._expr._match_lit(inpSeq, inpPos, lookAheadString))
+        return Drop.__make_return_value(self._expr._match_lit(inpSeq, inpPos, lookAheadString))
     
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
-        return self.__make_return_value(self._expr._match_eon(inpSeq, inpPos, lookAheadDummy))
+        return Drop.__make_return_value(self._expr._match_eon(inpSeq, inpPos, lookAheadDummy))
     
     def required_node_literal_epsilon(self):
         return self.expr.required_node_literal_epsilon()
