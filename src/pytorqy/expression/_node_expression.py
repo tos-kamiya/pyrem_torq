@@ -25,6 +25,8 @@ class Node(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
+    def extractNewLabels(self): return [ self.__newLabel ]
+    
     def __init__(self, label, newLabel=None):
         self.__label = label
         assert newLabel != ''
@@ -66,6 +68,8 @@ class AnyNode(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
+    def extractNewLabels(self): return [ self.__newLabel ]
+    
     def __init__(self, newLabel=None):
         self.__newLabel = newLabel
         assert newLabel != ''
@@ -103,6 +107,8 @@ class NodeMatch(TorqExpressionWithExpr):
     
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
+    
+    def extractNewLabels(self): return [ self.__newLabel ]
     
     def __init__(self, label, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
@@ -155,6 +161,8 @@ class AnyNodeMatch(TorqExpressionWithExpr):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
+    def extractNewLabels(self): return [ self.__newLabel ]
+    
     def __init__(self, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
@@ -202,6 +210,8 @@ class NodeClass(TorqExpression):
     
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
+    
+    def extractNewLabels(self): return [ self.__newLabel ]
     
     def __init__(self, labels, newLabel=None):
         self.__labels = frozenset(labels)
@@ -262,6 +272,8 @@ class InsertNode(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
+    def extractNewLabels(self): return [ self.__newLabel ]
+    
     def __init__(self, newLabel):
         assert newLabel not in ( None, '', FLATTEN )
         self.__newLabel = newLabel
@@ -287,6 +299,8 @@ class BuildToNode(TorqExpressionWithExpr):
     
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
+    
+    def extractNewLabels(self): return [ self.__newLabel ]
     
     def __init__(self, newLabel, expr):
         #assert expr is not None # use Node, instead!

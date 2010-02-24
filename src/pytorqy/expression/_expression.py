@@ -404,7 +404,6 @@ class Search(TorqExpressionWithExpr):
     def __init__(self, expr):
         self._set_expr(expr)
         rnle = expr.required_node_literal_epsilon()
-        self.__isTargetLabel = self.__isTargetString = None
         self.__rnle = None if rnle is None else ( rnle[0], rnle[1], True )
     
     def _match_node(self, inpSeq, inpPos, lookAhead):

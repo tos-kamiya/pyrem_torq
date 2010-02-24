@@ -264,8 +264,6 @@ def convert_to_expression_object(seq, replaces=None):
             replaceTable = { replaces[0]:replaces[1] }
         else:
             for label, expr in replaces.iteritems():
-                if not isinstance(expr, TorqExpression):
-                    print "here"
                 assert isinstance(expr, TorqExpression)
             replaceTable = replaces
     else:

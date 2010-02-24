@@ -12,14 +12,14 @@ def _parsing_expr_iter():
         return expr
     
     # atomic
-    parenv = BtN('v', Drop(L('(')) + [0,]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
-    numberv = BtN('v', Rex(r"^(\d|[.])"))
-    yield Search(to_recursive(parenv | numberv | Any()))
+    parenV = BtN('v', Drop(L('(')) + [0,]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
+    numberV = BtN('v', Rex(r"^(\d|[.])"))
+    yield Search(to_recursive(parenV | numberV | Any()))
 
     # unary +,-
     vSearch = NM('v', Search(M('0')))
-    signv = BtN('v', (LC('+-')) + vSearch)
-    yield to_recursive([0,1]*signv + [0,]*((vSearch + LC('+-')) | signv | Any()))
+    signV = BtN('v', (LC('+-')) + vSearch)
+    yield to_recursive([0,1]*signV + [0,]*((vSearch + LC('+-')) | signV | Any()))
     
     # multiply, divide
     vSearch = NM('v', Search(M('0')))
@@ -41,9 +41,11 @@ def interpret(ast):
         itemQ = collections.deque(nodeOrItem[1:])
         i = itemQ.popleft()
         if i in ('+', '-'): # unary +,-
+            # op, value
             assert len(itemQ) == 1
             return interpret_i(itemQ.popleft()) * (-1.0 if i == '-' else 1.0)
         else:
+            # value, op, value, op value, ...
             value = interpret_i(i)
             while itemQ:
                 op = itemQ.popleft()

@@ -118,3 +118,4 @@ class XcpThenAny(TorqExpressionWithExpr):
         elif isinstance(expr, Never):
             return Any()
         return XcpThenAny(expr)
+    
