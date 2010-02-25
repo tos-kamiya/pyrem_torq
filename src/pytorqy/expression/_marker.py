@@ -31,8 +31,8 @@ class Marker(TorqExpression):
             raise TypeError("Marker.setexpr()'s argument must be an TorqExpression")
     expr = property(getexpr, setexpr, None)
     
-    def expr_iter(self):
-        yield self.__expr
+    def extract_exprs(self):
+        return [ self.__expr ]
         
     def __raise_error(self, inpPos):
         e = InterpretError("Interpreting Marker w/o valid expression: '%s'" % self.__name)
@@ -63,10 +63,11 @@ def inner_expr_iter(expr):
             ide = id(e)
             if ide in visitedExprIDSet: return # prevent infinite recursion
             visitedExprIDSet.add(ide)
-        for item in e.expr_iter():
-            if item is not None:
-                yield item
-                for v in iei_i(item): yield v
+        if hasattr(e, "extract_exprs"):
+            for item in e.extract_exprs():
+                if item is not None:
+                    yield item
+                    for v in iei_i(item): yield v
     return iei_i(expr)
 
 def inner_marker_iter(expr):

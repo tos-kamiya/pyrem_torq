@@ -18,7 +18,7 @@ class Literal(TorqExpression):
     def __repr__(self): return "Literal(%s)" % repr(self.__string)
     def __hash__(self): return hash("Literal") + hash(self.__string)
     
-    def extractStrings(self):
+    def extract_strings(self):
         return [ self.__string ]
     
     def required_node_literal_epsilon(self):
@@ -70,7 +70,7 @@ class LiteralClass(TorqExpression):
     def __repr__(self): return "LiteralClass([%s])" % (",".join(repr(s) for s in self.__strings))
     def __hash__(self): return hash("LiteralClass") + sum(map(hash, self.__strings))
     
-    def extractStrings(self):
+    def extract_strings(self):
         return sorted(self.__strings)
     
     def required_node_literal_epsilon(self):
@@ -88,7 +88,7 @@ class LiteralClass(TorqExpression):
         mergedStrings = []
         for item in literalExprOrliteralClassExprs:
             assert isinstance(item, ( Literal, LiteralClass ))
-            mergedStrings.extend(item.extractStrings())
+            mergedStrings.extend(item.extract_strings())
         return LiteralClass(mergedStrings)
 
     @staticmethod

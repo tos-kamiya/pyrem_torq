@@ -10,12 +10,6 @@ _islist = list.__instancecheck__
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
-    def expr_iter(self): 
-        # will yield None, if the expression has an attribute 'expr' and its value is None
-        # or if the expression has an attribute 'exprs', which contains None as an item
-        raise StopIteration
-        yield # dummy
-    
     def __add__(self, other):
         return Seq.build(self, other)
     
@@ -78,16 +72,16 @@ class TorqExpression(object):
     
     def __eq__(self, right): 
         if not isinstance(right, self.__class__): return False
-        subexprs = list(self.expr_iter())
-        if subexprs: return subexprs == list(right.expr_iter())
+        subexprs = list(self.extract_exprs())
+        if subexprs: return subexprs == list(right.extract_exprs())
     
     def __repr__(self): 
-        subexprs = list(self.expr_iter())
+        subexprs = list(self.extract_exprs())
         return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, subexprs)) ) if subexprs else \
                 "%s()" % self.__class__.__name__
         
     def __hash__(self):
-        return hash(self.__class__.__name__) + sum(hash(e) for e in self.expr_iter())
+        return hash(self.__class__.__name__) + sum(hash(e) for e in self.extract_exprs())
 
 class TorqExpressionWithExpr(TorqExpression):
     __slots__ = [ '_expr', '_expr_match_node', '_expr_match_lit', '_expr_match_eon' ]
@@ -99,8 +93,8 @@ class TorqExpressionWithExpr(TorqExpression):
         assert isinstance(expr, TorqExpression)
         self._expr = expr
     
-    def expr_iter(self):
-        yield self._expr
+    def extract_exprs(self):
+        return [ self._expr ]
 
 def _orflatener(exprs):
     for e in exprs:
@@ -149,8 +143,8 @@ class Or(TorqExpression):
                     L.append(expr)
         return ntbl, ltbl, elst, None in list(r for _, r in exprAndReqs)
     
-    def expr_iter(self):
-        for e in self.__exprs: yield e
+    def extract_exprs(self):
+        return list(self.__exprs)
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         for expr in self.__ntbl_get(lookAheadNode[0], self.__elst):
@@ -210,8 +204,8 @@ class Seq(TorqExpression):
         for expr in self.__exprs: assert isinstance(expr, TorqExpression)
         self.__expr0 = self.__exprs[0] if self.__exprs else Epsilon()
         
-    def expr_iter(self):
-        for e in self.__exprs: yield e
+    def extract_exprs(self):
+        return list(self.__exprs)
         
     def __init__(self, *exprs):
         self._set_exprs(exprs)

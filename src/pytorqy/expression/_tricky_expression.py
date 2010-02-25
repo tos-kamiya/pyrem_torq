@@ -1,4 +1,6 @@
 from ._expression import *
+from ._literal_expression import Literal, LiteralClass
+from ._node_expression import Node, NodeClass
 
 _zeroLengthReturnValue = 0, (), ()
 
@@ -21,20 +23,19 @@ class Req(TorqExpressionWithExpr):
         return self.expr.required_node_literal_epsilon()
             
     def seq_merged(self, other):
-        if isinstance(self.expr, ( Seq, Repeat, Search )): return None
-
-        rs = self.required_node_literal_epsilon()
-        ro = other.required_node_literal_epsilon()
-        if rs is None or ro is None: return None
-        
-        selfAcceptsEmpty = not not rs[2]
-        otherAcceptsEmpty = not not ro[2]
-        if selfAcceptsEmpty >= otherAcceptsEmpty and \
-                set(rs[0]).issuperset(set(ro[0])) and \
-                set(rs[1]).issuperset(set(ro[1])):
-            # in this case, self's requirement is equivalent or superset to other's requirement.
-            # so self will not do filter out other than other does.
-            return other
+        if isinstance(self.expr, ( Literal, LiteralClass, Node, NodeClass )):
+            rs = self.required_node_literal_epsilon()
+            ro = other.required_node_literal_epsilon()
+            if rs is None or ro is None: return None
+            
+            selfAcceptsEmpty = not not rs[2]
+            otherAcceptsEmpty = not not ro[2]
+            if selfAcceptsEmpty >= otherAcceptsEmpty and \
+                    set(rs[0]).issuperset(set(ro[0])) and \
+                    set(rs[1]).issuperset(set(ro[1])):
+                # in this case, self's requirement is equivalent or superset to other's requirement.
+                # so self will not do filter out other than other does.
+                return other
         
     @staticmethod
     def build(expr): 
