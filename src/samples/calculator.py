@@ -6,30 +6,33 @@ from pytorqy.expression_shortname import BtN, L, LC, M, NM
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
 
-def _parsing_expr_iter():    
+def _build_parsing_exprs():    
     def to_recursive(expr): 
         assign_marker_expr(expr, '0', expr) 
         return expr
+    r = []
     
     # atomic
-    parenV = BtN('v', Drop(L('(')) + [0,]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
+    parenV = BtN('v', Drop(L('(')) + [0,None]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
     numberV = BtN('v', Rex(r"^(\d|[.])"))
-    yield Search(to_recursive(parenV | numberV | Any()))
+    r.append(Search(to_recursive(parenV | numberV | Any())))
 
     # unary +,-
     vSearch = NM('v', Search(M('0')))
-    signV = BtN('v', (LC('+-')) + vSearch)
-    yield to_recursive([0,1]*signV + [0,]*((vSearch + LC('+-')) | signV | Any()))
+    signV = BtN('v', (LC('+-')) + vSearch) + [0,1]*LC('+-')
+    r.append(to_recursive([0,1]*signV + [0,None]*((vSearch + [0,1]*LC('+-')) | signV | Any())))
     
     # multiply, divide
     vSearch = NM('v', Search(M('0')))
-    yield Search(to_recursive(BtN('v', vSearch + [1,]*(LC('*/%') + vSearch))))
+    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('*/%') + vSearch)))))
 
     # add, sub
     vSearch = NM('v', Search(M('0')))
-    yield Search(to_recursive(BtN('v', vSearch + [1,]*(LC('+-') + vSearch))))
+    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('+-') + vSearch)))))
+    
+    return r
 
-parsing_exprs = list(_parsing_expr_iter())
+parsing_exprs = _build_parsing_exprs()
 
 def interpret(ast):
     _opstr_to_func = { '+' : float.__add__, '-' : float.__sub__, 

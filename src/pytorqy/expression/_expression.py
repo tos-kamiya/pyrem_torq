@@ -442,7 +442,11 @@ class Search(TorqExpressionWithExpr):
 class InterpretError(StandardError):
     def __init__(self, message):
         StandardError.__init__(self, message)
+        self.message = message
         self.stack = []
+
+    def __repr__(self):
+        return "InterpretError(%s,%s)" % ( repr(self.message), repr(self.stack) )
 
 class ErrorExpr(TorqExpression):
     def __init__(self, message):

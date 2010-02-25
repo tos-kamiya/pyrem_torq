@@ -11,8 +11,6 @@ class __S(object):
     def __repr__(self): return "__S(%s)" % self.__name
 FLATTEN = __S('FLATTEN')
 
-is_special_label = __S.__instancecheck__
-
 class ForbiddenNewLabel(ValueError):
     pass
 
@@ -27,7 +25,8 @@ class Node(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
-    def extract_new_labels(self): return [ self.__newLabel ]
+    def extract_new_labels(self): 
+        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, label, newLabel=None):
         self.__label = label
@@ -70,7 +69,8 @@ class AnyNode(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
-    def extract_new_labels(self): return [ self.__newLabel ]
+    def extract_new_labels(self): 
+        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, newLabel=None):
         self.__newLabel = newLabel
@@ -112,7 +112,8 @@ class NodeMatch(TorqExpressionWithExpr):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
-    def extract_new_labels(self): return [ self.__newLabel ]
+    def extract_new_labels(self): 
+        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, label, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
@@ -165,7 +166,8 @@ class AnyNodeMatch(TorqExpressionWithExpr):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
-    def extract_new_labels(self): return [ self.__newLabel ]
+    def extract_new_labels(self): 
+        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
@@ -217,7 +219,8 @@ class NodeClass(TorqExpression):
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
-    def extract_new_labels(self): return [ self.__newLabel ]
+    def extract_new_labels(self): 
+        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, labels, newLabel=None):
         self.__labels = frozenset(labels)

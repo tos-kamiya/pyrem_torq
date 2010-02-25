@@ -7,6 +7,7 @@ packages = [
     "pytorqy.expression",
     "pytorqy.expression_shortname",
     "pytorqy.compile",
+    "pytorqy.operatorkit"
 ]
 
 setup(
