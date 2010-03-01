@@ -6,10 +6,10 @@ Created on 2009/07/17
 
 import unittest
 
-from pytorqy.treeseq import *
-from pytorqy.expression import *
+from pyrem_torq.treeseq import *
+from pyrem_torq.expression import *
 
-class TestPytorqyExpression(unittest.TestCase):
+class TestTorqExpression(unittest.TestCase):
     def test1st(self):
         expr = Literal('ab')
         seq = [ 'text', 'ab' ]
@@ -286,8 +286,8 @@ class TestPytorqyExpression(unittest.TestCase):
         self.assertEqual(posDelta, 0)
         self.assertEqual(outSeq, [ ])
 
-def TestSuite(TestPytorqyExpression):
-    return unittest.makeSuite(TestPytorqyExpression)
+def TestSuite(TestTorqExpression):
+    return unittest.makeSuite(TestTorqExpression)
 
 if __name__ == '__main__':
     unittest.main()

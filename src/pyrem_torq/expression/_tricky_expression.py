@@ -1,3 +1,5 @@
+from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
+
 from ._expression import *
 from ._literal_expression import Literal, LiteralClass
 from ._node_expression import Node, NodeClass
@@ -71,7 +73,7 @@ class Xcp(TorqExpressionWithExpr):
         return Xcp(expr)
 
 class EndOfNode(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_eon(self, inpSeq, curInpPos, lookAheadDummy): return _zeroLengthReturnValue
@@ -83,7 +85,7 @@ class EndOfNode(TorqExpression): # singleton
     def build(): return EndOfNode()
 
 class BeginOfNode(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_node(self, inpSeq, inpPos, lookAhead):

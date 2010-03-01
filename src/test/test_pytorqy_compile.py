@@ -6,24 +6,24 @@ Created on 2009/07/22
 
 import sys
 
-import pytorqy.compile
-import pytorqy.expression
-import pytorqy.treeseq
+import pyrem_torq.compile
+import pyrem_torq.expression
+import pyrem_torq.treeseq
 
 import unittest
 
 def compiling(exprLine):
     print "exprLine=", exprLine
     try:
-        seq = pytorqy.compile.parse_to_ast(exprLine, sys.stderr)
-    except pytorqy.expression.InterpretError as e:
-        raise pytorqy.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
-    print "ast=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
-    exprs = pytorqy.compile.convert_to_expression_object(seq)
+        seq = pyrem_torq.compile.parse_to_ast(exprLine, sys.stderr)
+    except pyrem_torq.expression.InterpretError as e:
+        raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
+    print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
+    exprs = pyrem_torq.compile.convert_to_expression_object(seq)
     print "exprs=", exprs
     return exprs
 
-class TestPytorqyComile(unittest.TestCase):
+class TestTorqComile(unittest.TestCase):
     def test1st(self):
         compiling('text :: (v <- +(r"^\d" | ".")) | (null <- +(" " | ">"));')
         
@@ -48,7 +48,7 @@ class TestPytorqyComile(unittest.TestCase):
     | (word <- +(h"a" | "_"))
     | (multiline_comment <- "/", "*" *(xcp("*", "/"), any), "*", "/");
 """
-        self.assertRaises(pytorqy.compile.CompileError, compiling, exprStr)
+        self.assertRaises(pyrem_torq.compile.CompileError, compiling, exprStr)
     
 #    def test8th(self):
 #        exprStr = "insert(hoge)"

@@ -1,22 +1,22 @@
 import sys, re
 
-from pytorqy.utility import split_to_strings_iter
-import pytorqy.expression
-import pytorqy.compile
-import pytorqy.treeseq
+from pyrem_torq.utility import split_to_strings_iter
+import pyrem_torq.expression
+import pyrem_torq.compile
+import pyrem_torq.treeseq
 
 import unittest
 
-to_gsublike_expr = pytorqy.expression.Search.build
+to_gsublike_expr = pyrem_torq.expression.Search.build
 
 def my_compile(exprStr, recursionAtMarker0=True):
     try:
-        seq = pytorqy.compile.parse_to_ast(exprStr, sys.stderr)
-    except pytorqy.expression.InterpretError as e:
-        raise pytorqy.compile.CompileError, "pos %s: error: %s" % ( repr(e.stack), str(e) )
-    #print "ast=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        seq = pyrem_torq.compile.parse_to_ast(exprStr, sys.stderr)
+    except pyrem_torq.expression.InterpretError as e:
+        raise pyrem_torq.compile.CompileError, "pos %s: error: %s" % ( repr(e.stack), str(e) )
+    #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
-    exprs = pytorqy.compile.convert_to_expression_object(seq)
+    exprs = pyrem_torq.compile.convert_to_expression_object(seq)
     
     if recursionAtMarker0:
         for expr in exprs:
@@ -27,7 +27,7 @@ def my_compile(exprStr, recursionAtMarker0=True):
 def compile_exprs(exprStrs):
     exprs = []
     for exprStr in exprStrs:
-        expr = pytorqy.compile.compile(exprStr, recursionAtMarker0=True)
+        expr = pyrem_torq.compile.compile(exprStr, recursionAtMarker0=True)
         #expr = my_compile(exprStr, recursiionAtMarker0=True)
         
         assert len(expr) == 1
@@ -35,7 +35,7 @@ def compile_exprs(exprStrs):
         exprs.append(expr)
     return exprs
 
-class TestPytorqyComileAndInterpret(unittest.TestCase):
+class TestTorqComileAndInterpret(unittest.TestCase):
     def test1st(self):
         exprStrs = [ 
             r'~((v <- +(r"^\d" | ".")) | (null <- +(" " | "\t")));',
@@ -56,11 +56,11 @@ class TestPytorqyComileAndInterpret(unittest.TestCase):
         
         seq = [ 'code' ]; seq.extend(split_to_strings_iter("+1.0 + 2 * ((3 - 4) / -.5) ** 6"))
         for exprIndex, expr in enumerate(exprs):
-            print "exprIndex=", exprIndex, "cur seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+            print "exprIndex=", exprIndex, "cur seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
             newSeq = expr.parse(seq)
             self.assertTrue(newSeq, None)
             seq = newSeq
-        print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
         
     def test3rd(self):
         exprStrs = [
@@ -90,18 +90,18 @@ int main(int argc, char *argv[])
             posDelta, outSeq, dropSeq = expr.match(seq, 1)
             self.assertEqual(1 + posDelta, len(seq))
             seq = [ seq[0] ] + outSeq
-        print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
     def test4th(self):
-        IN = pytorqy.expression.InsertNode.build
-        BtN = pytorqy.expression.BuildToNode.build
-        L = pytorqy.expression.Literal.build
-        A = pytorqy.expression.Any.build
-        Q = pytorqy.expression.Req.build
-        S = pytorqy.expression.Search.build
+        IN = pyrem_torq.expression.InsertNode.build
+        BtN = pyrem_torq.expression.BuildToNode.build
+        L = pyrem_torq.expression.Literal.build
+        A = pyrem_torq.expression.Any.build
+        Q = pyrem_torq.expression.Req.build
+        S = pyrem_torq.expression.Search.build
         
         eolExpr = BtN('eol', L("\r\n") | L("\n") | L("\r"))
-        expr = S(eolExpr) + Q(pytorqy.expression.EndOfNode()) + IN('eof')
+        expr = S(eolExpr) + Q(pyrem_torq.expression.EndOfNode()) + IN('eof')
         
         seq = [ 'code' ]; seq.extend(split_to_strings_iter("abc\n"))
 
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         self.assertTrue(foundAnd)
         self.assertTrue(foundOr)
                     
-        print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
     def test6th(self):
         searchWordLike = r'~(wordlike <- "_", *(r"^[a-zA-Z]" | r"\d" | "_") | r"^[a-zA-Z]", *(r"^[a-zA-Z]" | r"\d" | "_"));'
@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
         seq = exprs[0].parse(seq)
         self.assertEqual(seq[1], [ 'wordlike', u'argv' ])
         
-        print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
         
     def test7th(self):
         searchWordLike = r'~(word <- ("_", *("_" | r"^[a-zA-Z]" | r"^\d") | r"^[a-zA-Z]", *("_" | r"^[a-zA-Z]" | r"^\d")));'
@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
             self.assertTrue(newSeq)
             seq = newSeq
         
-        print "result seq=", "\n".join(pytorqy.treeseq.seq_pretty(seq))
+        print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
 
     def test8th(self):
         searchFloatingPointLitearal = r"""~(

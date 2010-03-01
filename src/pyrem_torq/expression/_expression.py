@@ -1,6 +1,6 @@
 import itertools
 
-from pytorqy.utility import SingletonWoInitArgs
+from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 
 class InvalidRepetitionCount(ValueError):
     pass
@@ -10,11 +10,9 @@ _islist = list.__instancecheck__
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
-    def __add__(self, other):
-        return Seq.build(self, other)
+    def __add__(self, other): return Seq.build(self, other)
     
-    def __or__(self, other):
-        return Or.build(self, other)
+    def __or__(self, other): return Or.build(self, other)
     
     def __rmul__(self, left):
         if isinstance(left, list):
@@ -93,8 +91,7 @@ class TorqExpressionWithExpr(TorqExpression):
         assert isinstance(expr, TorqExpression)
         self._expr = expr
     
-    def extract_exprs(self):
-        return [ self._expr ]
+    def extract_exprs(self): return [ self._expr ]
 
 def _orflatener(exprs):
     for e in exprs:
@@ -204,24 +201,23 @@ class Seq(TorqExpression):
         for expr in self.__exprs: assert isinstance(expr, TorqExpression)
         self.__expr0 = self.__exprs[0] if self.__exprs else Epsilon()
         
-    def extract_exprs(self):
-        return list(self.__exprs)
+    def extract_exprs(self): return list(self.__exprs)
         
     def __init__(self, *exprs):
         self._set_exprs(exprs)
         self.__set_rnle()
         
     def __set_rnle(self):
-        ns, ls, epsilon = [], [], True
+        ns, ls = [], []
         for r in (expr.required_node_literal_epsilon() for expr in self.exprs):
             if r is None: 
                 self.__rnle = None
                 return
             ns.extend(r[0]); ls.extend(r[1])
             if not r[2]: 
-                epsilon = False
-                break # for r
-        self.__rnle = sorted(set(ns)), sorted(set(ls)), epsilon
+                self.__rnle = sorted(set(ns)), sorted(set(ls)), False
+                return
+        self.__rnle = sorted(set(ns)), sorted(set(ls)), True
     
     def __match_tail(self, inpSeq, inpPos, r):
         if r is None: return None
@@ -350,8 +346,7 @@ class Repeat(TorqExpressionWithExpr):
     
     def __hash__(self): return hash("Repeat") + hash(self.expr) + hash(self.__lowerLimit) + hash(self.__upperLimit)
 
-    def required_node_literal_epsilon(self):
-        return self.__rnle
+    def required_node_literal_epsilon(self): return self.__rnle
     
     @staticmethod
     def ZeroOrOne(expr): return _RepeatZeroOrOne(expr)
@@ -430,8 +425,7 @@ class Search(TorqExpressionWithExpr):
     def _match_eon(self, inpSeq, inpPos, lookAhead):
         return self._expr._match_eon(inpSeq, inpPos, lookAhead)
     
-    def required_node_literal_epsilon(self):
-        return self.__rnle
+    def required_node_literal_epsilon(self): return self.__rnle
     
     @staticmethod
     def build(expr): 
@@ -463,7 +457,7 @@ class ErrorExpr(TorqExpression):
     def build(message): return ErrorExpr(message)
 
 class Epsilon(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_node(self, inpSeq, inpPos, lookAhead): return _zeroLengthReturnValue
@@ -478,18 +472,17 @@ class Epsilon(TorqExpression): # singleton
     def build(): return Epsilon()
     
 class Any(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
 
-    def _match_node(self, inpSeq, inpPos, lookAhead): 
-        return 1, [ inpSeq[inpPos] ], ()
+    def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ], ()
     _match_lit = _match_node
     
     @staticmethod
     def build(): return Any()
 
 class Never(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def seq_merged(self, other): return self

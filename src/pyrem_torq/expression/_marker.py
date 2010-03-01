@@ -17,8 +17,7 @@ class Marker(TorqExpression):
     def __hash__(self): return hash("Marker") + hash(self.__name)
     
     def getname(self): return self.__name
-    def setname(self, name):
-        self.__name = name
+    def setname(self, name): self.__name = name
     name = property(getname, setname, None)
     
     def getexpr(self): return self.__expr
@@ -31,8 +30,7 @@ class Marker(TorqExpression):
             raise TypeError("Marker.setexpr()'s argument must be an TorqExpression")
     expr = property(getexpr, setexpr, None)
     
-    def extract_exprs(self):
-        return [ self.__expr ]
+    def extract_exprs(self): return [ self.__expr ]
         
     def __raise_error(self, inpPos):
         e = InterpretError("Interpreting Marker w/o valid expression: '%s'" % self.__name)

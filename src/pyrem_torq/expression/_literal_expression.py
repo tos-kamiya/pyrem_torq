@@ -1,6 +1,6 @@
 import re
 
-from pytorqy.utility import SingletonWoInitArgs
+from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 from ._expression import TorqExpression
 
 class Literal(TorqExpression):
@@ -35,7 +35,7 @@ class Literal(TorqExpression):
         return None
 
 class AnyLiteral(TorqExpression): # singleton
-    __metaclass__ = SingletonWoInitArgs
+    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):

@@ -67,10 +67,10 @@ def seq_pretty(seq):
             return
         len_seq = len(seq)
         if find_type_range(str, seq, 1) == len_seq:
-            r.append(indent + "[ %s: %s ]" % ( seq[0], repr("".join(islice(seq, 1, None)))))
+            r.append(indent + "[ %s: %s ]" % ( seq[0], ",".join(map(repr, islice(seq, 1, None)))))
             return
         if find_type_range(unicode, seq, 1) == len_seq:
-            r.append(indent + "[ %s: %s ]" % ( seq[0], repr(u"".join(islice(seq, 1, None)))))
+            r.append(indent + "[ %s: %s ]" % ( seq[0], u",".join(map(repr, islice(seq, 1, None)))))
             return
         
         newIndent = indent + "  "
@@ -84,12 +84,12 @@ def seq_pretty(seq):
                 continue # while i
             endPos = find_type_range(str, seq, i)
             if endPos:
-                r.append(newIndent + repr("".join(seq[i:endPos])))
+                r.append(newIndent + ",".join(map(repr, seq[i:endPos])))
                 i = endPos
                 continue # while i
             endPos = find_type_range(unicode, seq, i)
             if endPos:
-                r.append(newIndent + repr(u"".join(seq[i:endPos])))
+                r.append(newIndent + ",".join(map(repr, seq[i:endPos])))
                 i = endPos
                 continue # while i
             r.append(newIndent + repr(item))

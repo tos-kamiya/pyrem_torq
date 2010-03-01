@@ -1,7 +1,7 @@
 import re, collections
-from pytorqy.expression import *
-from pytorqy.expression_shortname import BtN, L, LC, M, NM
-#import pytorqy.treeseq as pt
+from pyrem_torq.expression import *
+from pyrem_torq.expression_shortname import BtN, L, LC, M, NM
+import pyrem_torq.treeseq as ptt
 
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
@@ -20,15 +20,15 @@ def _build_parsing_exprs():
     # unary +,-
     vSearch = NM('v', Search(M('0')))
     signV = BtN('v', (LC('+-')) + vSearch) + [0,1]*LC('+-')
-    r.append(to_recursive([0,1]*signV + [0,None]*((vSearch + [0,1]*LC('+-')) | signV | Any())))
+    r.append(to_recursive([0,1]*signV + [0,None]*((vSearch + [0,1]*LC('+-')) | signV | vSearch | Any())))
     
     # multiply, divide
     vSearch = NM('v', Search(M('0')))
-    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('*/%') + vSearch)))))
+    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('*/%') + vSearch)) | vSearch)))
 
     # add, sub
     vSearch = NM('v', Search(M('0')))
-    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('+-') + vSearch)))))
+    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('+-') + vSearch)) | vSearch)))
     
     return r
 
@@ -70,12 +70,12 @@ usage: calculator <expr>
     
     text = " ".join(sys.argv[1:])
     seq = tokenize(text)
-    #print(seq) # prints tokens
     for expr in parsing_exprs:
+        for L in ptt.seq_pretty(seq): print L # prints an seq
         newSeq = expr.parse(seq)
         if newSeq is None: raise SystemError
         seq = newSeq
-    #for L in pt.seq_pretty(seq): print(L) # prints an seq
+    for L in ptt.seq_pretty(seq): print L # prints an seq
     result = interpret(seq)
-    print(result)
+    print result
     

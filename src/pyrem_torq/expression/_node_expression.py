@@ -73,7 +73,6 @@ class AnyNode(TorqExpression):
         return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
     
     def __init__(self, newLabel=None):
-        self.__newLabel = newLabel
         assert newLabel != ''
         self.__newLabel = newLabel
         
