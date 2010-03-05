@@ -115,7 +115,7 @@ class Or(TorqExpression):
         if self.__including_unknown_req:
             self.__rnle = None
         else:
-            self.__rnle = sorted(ntbl.iterkeys()), sorted(ltbl.iterkeys()), not not self.__elst
+            self.__rnle = sorted(ntbl.iterkeys()), sorted(ltbl.iterkeys()), (not not self.__elst)
         self.__ntbl_get = ntbl.get
         self.__ltbl_get = ltbl.get
     

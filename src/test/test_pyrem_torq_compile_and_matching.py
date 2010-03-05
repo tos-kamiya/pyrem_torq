@@ -13,7 +13,7 @@ def my_compile(exprStr, recursionAtMarker0=True):
     try:
         seq = pyrem_torq.compile.parse_to_ast(exprStr, sys.stderr)
     except pyrem_torq.expression.InterpretError as e:
-        raise pyrem_torq.compile.CompileError, "pos %s: error: %s" % ( repr(e.stack), str(e) )
+        raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
     #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
     exprs = pyrem_torq.compile.convert_to_expression_object(seq)

@@ -26,7 +26,7 @@ class Node(TorqExpression):
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
+        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
     
     def __init__(self, label, newLabel=None):
         self.__label = label
@@ -70,7 +70,7 @@ class AnyNode(TorqExpression):
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
+        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
     
     def __init__(self, newLabel=None):
         assert newLabel != ''
@@ -112,7 +112,7 @@ class NodeMatch(TorqExpressionWithExpr):
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
+        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
     
     def __init__(self, label, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
@@ -166,7 +166,7 @@ class AnyNodeMatch(TorqExpressionWithExpr):
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
+        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
     
     def __init__(self, expr, newLabel=None):
         #assert expr is not None # use Node, instead!
@@ -219,7 +219,7 @@ class NodeClass(TorqExpression):
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel is not FLATTEN else ()
+        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
     
     def __init__(self, labels, newLabel=None):
         self.__labels = frozenset(labels)
