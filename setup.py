@@ -6,7 +6,7 @@ packages = [
     "pyrem_torq.treeseq",
     "pyrem_torq.expression",
     "pyrem_torq.compile",
-    "pyrem_torq.helper"
+    "pyrem_torq.extra"
 ]
 
 setup(

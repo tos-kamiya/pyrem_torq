@@ -3,7 +3,7 @@ import string
 import pyrem_torq.expression as _pte
 from pyrem_torq.treeseq import seq_pretty
 from pyrem_torq.utility import split_to_strings_iter
-import pyrem_torq.helper.expression_shortname as _pthes
+import pyrem_torq.extra.expression_shortname as _pthes
 
 # Priority of operators
 # ()
