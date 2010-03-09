@@ -285,6 +285,25 @@ class TestTorqExpression(unittest.TestCase):
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 0)
         self.assertEqual(outSeq, [ ])
+    
+    def testRemoveRedundantParen(self):
+        expr = Or(Req(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", Marker('0'), newLabel=FLATTEN),
+            NodeMatch("expr", Search(Marker('0'))),
+            Any())
+        assign_marker_expr(expr, '0', expr)
+        expr = Search(expr)
+        
+        seq = [ 'code', [ 'expr', [ 'literal', 'a' ] ] ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 1)
+        outSeq = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq, [ 'code', [ 'literal', 'a' ] ])
+
+        seq = [ 'code', [ 'expr', [ 'expr', [ 'literal', 'a' ] ] ] ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 1)
+        outSeq = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq, [ 'code', [ 'literal', 'a' ] ])
 
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)

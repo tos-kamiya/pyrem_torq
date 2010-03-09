@@ -1,8 +1,13 @@
-Pytorqy changelog
-==================
+Pyremics torqy changelog
+=========================
 
 Known Bugs
   - None.
+
+0.3 2010/03/08
+  - Changed module name from pytorqy to pyrem_torq.
+  - Added an experimental feature, operator_builder.
+  - Revised grammar.
 
 0.2 2010/02/22
   - Changed internal data strucutres for optimization.

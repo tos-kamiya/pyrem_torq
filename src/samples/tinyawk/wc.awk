@@ -1,5 +1,5 @@
 BEGIN {
-    lc = 0; wc = 0
+    lc = wc = 0
 }
 { 
     lc = lc + 1 
