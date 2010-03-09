@@ -11,8 +11,8 @@
 import re
 from pyrem_torq.compile import compile
 from pyrem_torq.expression import *
-import pyrem_torq.treeseq as ptt
 from pyrem_torq.extra.operator_builer import OperatorBuilder
+import pyrem_torq.treeseq as ptt # for debug code
 
 def tokenize(text):
     p = "|".join([
@@ -142,38 +142,35 @@ parsing_exprs = _build_parsing_exprs()
 
 class PatternActionInterpreter(object):
     def __init__(self):
-        self.nr = None
-        self.line, self.curFields = None, None
+        self.nr, self.line, self.curFields = None, None, None
         self.varTable = {}
-        
+    
+    def set_begin(self): 
+        self.nr, self.line, self.curFields = 0, None, []
+        self.varTable.update([ ( "NR", self.nr ), ( "NF", 0 ) ])
+            
+    def set_end(self):
+        self.nr, self.line, self.curFields = -1, None, []
+        self.varTable.update([ ( "NF", 0 ) ])
+    
     def set_line(self, nr, line):
-        self.nr = nr
-        if nr in ( 0, -1 ):
-            self.line, self.curFields = "", []
-            self.varTable["NF"] = 0
-        else:
-            self.line = line
-            fields = line.split()
-            self.varTable["NF"] = len(fields)
-            self.curFields = [ line ] + fields
-        if self.nr != -1:
-            self.varTable["NR"] = self.nr
+        assert nr >= 1
+        fields = line.split()
+        self.nr, self.line, self.curFields = nr, line, [ line ] + fields
+        self.varTable.update([ ( "NR", self.nr ), ( "NF", len(fields) ) ])
 
     def exec_pattern_action(self, exprNode, blockNode):
         e0 = exprNode[0]
-        if self.nr == 0:
-            if e0 == "r_BEGIN": self.exec_stmt(blockNode)
-        elif self.nr == -1:
-            if e0 == "r_END": self.exec_stmt(blockNode)
+        if e0 == "r_BEGIN":
+            if self.nr == 0: self.exec_stmt(blockNode)
+        elif e0 == "r_END":
+            if self.nr == -1: self.exec_stmt(blockNode) 
         else:
-            if e0 not in ("r_BEGIN", "r_END"):
-                if exprNode[0] == "expr_empty" or self.eval_expr(exprNode):
-                    self.exec_stmt(blockNode)
+            if self.nr >= 1 and (exprNode[0] == "expr_empty" or self.eval_expr(exprNode)):
+                self.exec_stmt(blockNode)
      
     def eval_expr(self, exprNode):
-        def to_int(s):
-            if not s: return 0
-            return int(s)
+        def cast_to_int(s): return 0 if not s else int(s) # an empty string is converted to 0
 
         if exprNode[0] != "expr":
             assert len(exprNode) == 2
@@ -196,11 +193,11 @@ class PatternActionInterpreter(object):
             value = self.eval_expr(seq[-1])
             for op in reversed(seq[:-1]):
                 opLbl = op[0]
-                if opLbl == "op_minus": value = to_int(value) * -1
-                elif opLbl == "op_plus": value = to_int(value) * 1
+                if opLbl == "op_minus": value = -cast_to_int(value)
+                elif opLbl == "op_plus": value = cast_to_int(value)
                 elif opLbl == "op_not": value = (1 if value in (0, '') else 0)
                 elif opLbl == "op_dollar": 
-                    index = to_int(value)
+                    index = cast_to_int(value)
                     if index < 0: raise IndexError
                     value = self.curFields[index] # may raise IndexError
                 else:
@@ -221,10 +218,10 @@ class PatternActionInterpreter(object):
             return "".join(str(self.eval_expr(v)) for v in seq[0::2])
         
         if seq1lbl in ( "op_mul", "op_div", "op_mod", "op_minus", "op_plus" ):
-            value = to_int(self.eval_expr(seq[0]))
+            value = cast_to_int(self.eval_expr(seq[0]))
             for op, rightExpr in zip(seq[1::2], seq[2::2]):
                 opLbl = op[0]
-                rightValue = to_int(self.eval_expr(rightExpr))
+                rightValue = cast_to_int(self.eval_expr(rightExpr))
                 if opLbl == "op_mul": value = value * rightValue
                 elif opLbl == "op_div": value = value // rightValue
                 elif opLbl == "op_mod": value = value % rightValue
@@ -296,13 +293,13 @@ class PatternActionInterpreter(object):
             
     def exec_stmt(self, stmtNode):
         if stmtNode and stmtNode[-1][0] in ("newline", "semicolon"):
-            stmtNode = stmtNode[:-1]
+            del stmtNode[-1]
         
-        if len(stmtNode) == 1: return
+        if len(stmtNode) == 1: # null statement (;)
+            return
         
         if stmtNode[0] == "block_empty":
-            print self.line
-            return
+            stmtNode = [ "stmt", "r_print" ]
         
         assert len(stmtNode) >= 2
         if stmtNode[0] == "block":
@@ -312,17 +309,18 @@ class PatternActionInterpreter(object):
         
         assert stmtNode[0] == "stmt"
         if stmtNode[1][0] == "r_if":
-            seq = stmtNode[1:]
+            seq = stmtNode[2:]
             while seq:
-                assert len(seq) >= 3
-                assert seq[0][0] in ( "r_if", "r_elif" )
-                if self.eval_expr(seq[1]) not in (0, ''):
-                    self.exec_stmt(seq[2])
+                assert len(seq) >= 2
+                if self.eval_expr(seq[0]) not in (0, ''):
+                    self.exec_stmt(seq[1])
                     break # while seq
-                if len(seq) == 3: break # while seq
-                if seq[3][0] == "r_else":
-                    self.exec_stmt(seq[4])
+                if len(seq) == 2: break # while seq
+                if seq[2][0] == "r_else":
+                    assert len(seq) == 4
+                    self.exec_stmt(seq[3])
                     break # while seq
+                assert seq[2][0] == "r_elif"
                 seq = seq[3:]
             return
         
@@ -370,7 +368,7 @@ def main(debugTrace=False):
     # interpretation
     patternActions = [( paNode[1], paNode[2] ) for paNode in seq[1:]]
     interp = PatternActionInterpreter()
-    interp.set_line(0, None)
+    interp.set_begin()
     for exprNode, blockNode in patternActions:
         interp.exec_pattern_action(exprNode, blockNode)
     if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
@@ -384,7 +382,7 @@ def main(debugTrace=False):
             if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
         if inputFile: f.close()
     
-    interp.set_line(-1, None)
+    interp.set_end()
     for exprNode, blockNode in patternActions:
         interp.exec_pattern_action(exprNode, blockNode)
     if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
