@@ -1,12 +1,13 @@
 # tinyawk
-# an interpreter of a very small subset of AWK programming language.
+# an interpreter of a extremely small subset of AWK programming language.
 # supported reserved words are:
-#   BEGIN END NF NR if else print while
-#   ( ) [ ] { } ; , < <= > >= == != ~ !~ && || ! - + * / % $
+#   BEGIN END NF NR if else next print while
+#   ( ) [ ] { } ; , < <= > >= == != && || ! - + * / % $
 # note that: 
-# (1) escape sequences are not supported in either string literal or regex.
-# (2) all numbers are integers, no floating points.
-# (3) assignment to NF, NR or $* is undefined behavior.
+# - escape sequences in string are not supported.
+# - regular expression is Python's one.
+# - all numbers are integers, no floating points.
+# - assignment to NF, NR or $* is undefined behavior.
 
 import re
 from pyrem_torq.compile import compile
@@ -20,7 +21,7 @@ def tokenize(text):
         r"#[^\n]*", # comment
         r"[ \t]+", r"\n", # white spaces, newline
         r"[a-zA-Z_](\w|_)*", # identifier
-        r"[<>!=]=|!?~|&&|[|][|]", r"[-+*/%<>!=()${},;]|\[|\]" # operators
+        r"[<>!=]=|&&|[|][|]", r"[-+*/%<>!=()${},;]|\[|\]" # operators
     ])
     return [ 'code' ] + [m.group() for m in re.finditer(p, text)]
 
@@ -30,11 +31,10 @@ def _build_parsing_exprs():
     # identify reserved words, literals, identifiers
     e = Search(compile(r"""
     (r_BEGIN <- "BEGIN") | (r_END <- "END")
-    | (r_print <- "print") | (r_if <- "if") | (r_else <- "else") | (r_while <- "while")
+    | (r_next <- "next") | (r_print <- "print") | (r_if <- "if") | (r_else <- "else") | (r_while <- "while")
     | (id <- r"^[a-zA-Z_]") 
     | (l_integer <- r"^[0-9]") | (l_string <- r"^\"") | (l_regex <- r"^/")
     | (op_gt <- ">") | (op_ge <- ">=") | (op_lt <- "<") | (op_le <- "<=") | (op_ne <- "!=") | (op_eq <- "==")
-    | (op_match <- "~") | (op_notmatch <- "!~")
     | (op_and <- "&&") | (op_or <- "||")
     | (op_plus <- "+") | (op_minus <- "-") | (op_mul <- "*") | (op_div <- "/") | (op_mod <- "%")
     | (op_assign <- "=") | (op_not <- "!") | (op_dollar <- "$")
@@ -60,7 +60,7 @@ def _build_parsing_exprs():
         (null <- newline))
     | (pa <- 
         (expr <- +any^(LB | newline)), 
-        ((block <- (null <- LB), *(xcp(RP), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
+        ((block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
         (null <- newline))
     | (null <- newline)
     ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })[0]
@@ -72,6 +72,7 @@ def _build_parsing_exprs():
     (stmt <- 
         semicolon 
         | r_print, (expr <- +any^(semicolon | newline)), (semicolon | newline)
+        | r_next, (semicolon | newline)
         | (expr <- +any^(semicolon | newline)), (semicolon | newline))
     ;""")[0]
     e = Search(compile(r"""
@@ -110,8 +111,7 @@ def _build_parsing_exprs():
         # The concatenation operator is epsilon, so that insert a token 'op_cat' where the operator appears
         
         des.append(( "binary compare ops", kit.build_tOt_expr(\
-                n("op_gt"), n("op_ge"), n("op_lt"), n("op_le"), n("op_ne"), n("op_eq"),
-                n("op_match"), n("op_notmatch")) ))
+                n("op_gt"), n("op_ge"), n("op_lt"), n("op_le"), n("op_ne"), n("op_eq")) ))
         des.append(( "binary logical-and", kit.build_tOt_expr(n("op_and")) ))
         des.append(( "binary logical-or", kit.build_tOt_expr(n("op_or")) ))
         des.append(( "comma", kit.build_tOt_expr(n("comma")) ))
@@ -140,6 +140,8 @@ def _build_parsing_exprs():
 
 parsing_exprs = _build_parsing_exprs()
 
+class NextStmtException(Exception): pass
+
 class PatternActionInterpreter(object):
     def __init__(self):
         self.nr, self.line, self.curFields = None, None, None
@@ -159,15 +161,15 @@ class PatternActionInterpreter(object):
         self.nr, self.line, self.curFields = nr, line, [ line ] + fields
         self.varTable.update([ ( "NR", self.nr ), ( "NF", len(fields) ) ])
 
-    def exec_pattern_action(self, exprNode, blockNode):
-        e0 = exprNode[0]
-        if e0 == "r_BEGIN":
-            if self.nr == 0: self.exec_stmt(blockNode)
-        elif e0 == "r_END":
-            if self.nr == -1: self.exec_stmt(blockNode) 
-        else:
-            if self.nr >= 1 and (exprNode[0] == "expr_empty" or self.eval_expr(exprNode)):
-                self.exec_stmt(blockNode)
+    def exec_pattern_actions(self, patternActions):
+        try:
+            for exprNode, blockNode in patternActions:
+                e0 = exprNode[0]
+                if e0 == "r_BEGIN" and self.nr == 0 or e0 == "r_END" and self.nr == -1 or \
+                        e0 not in ("r_BEGIN", "r_END") and self.nr >= 1 and (exprNode[0] == "expr_empty" or self.eval_expr(exprNode)):
+                    self.exec_stmt(blockNode)
+        except NextStmtException:
+            pass
      
     def eval_expr(self, exprNode):
         def cast_to_int(s): return 0 if not s else int(s) # an empty string is converted to 0
@@ -248,15 +250,6 @@ class PatternActionInterpreter(object):
                 assert False
             return value
         
-        if seq1lbl in ( "op_match", "op_notmatch" ):
-            assert len(seq) == 3
-            leftValue = str(self.eval_expr(seq[0]))
-            assert seq[2][0] == "l_regex"
-            reString = seq[2][1][1:-1] # remove /-chars.
-            value = 1 if re.match(reString, leftValue) else 0
-            if seq1lbl == "op_notmatch": value = 1 - value
-            return value
-        
         if seq1lbl == "op_and":
             for e in seq[0::2]:
                 value = self.eval_expr(e)
@@ -335,6 +328,9 @@ class PatternActionInterpreter(object):
                 " ".join(str(self.eval_expr(v)) for v in stmtNode[2::2])
             return
         
+        if stmtNode[1][0] == "r_next":
+            raise NextStmtException
+        
         assert len(stmtNode) == 2
         self.eval_expr(stmtNode[1])
 
@@ -369,22 +365,19 @@ def main(debugTrace=False):
     patternActions = [( paNode[1], paNode[2] ) for paNode in seq[1:]]
     interp = PatternActionInterpreter()
     interp.set_begin()
-    for exprNode, blockNode in patternActions:
-        interp.exec_pattern_action(exprNode, blockNode)
+    interp.exec_pattern_actions(patternActions)
     if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
     
     if any(e[0] not in ("r_BEGIN", "r_END") for e, b in patternActions):
         f = open(inputFile, "r") if inputFile else sys.stdin
         for lnum, L in enumerate(f):
             interp.set_line(lnum+1, L.rstrip())
-            for exprNode, blockNode in patternActions:
-                interp.exec_pattern_action(exprNode, blockNode)
+            interp.exec_pattern_actions(patternActions)
             if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
         if inputFile: f.close()
     
     interp.set_end()
-    for exprNode, blockNode in patternActions:
-        interp.exec_pattern_action(exprNode, blockNode)
+    interp.exec_pattern_actions(patternActions)
     if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
 
 if __name__ == '__main__':
