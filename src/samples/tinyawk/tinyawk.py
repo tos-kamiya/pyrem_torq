@@ -71,6 +71,7 @@ def _build_parsing_exprs():
     getSimpleStmt = compile(r"""
     (stmt <- 
         semicolon 
+        | r_print_empty, (semicolon | newline)
         | r_print, (expr <- +any^(semicolon | newline)), (semicolon | newline)
         | r_next, (semicolon | newline)
         | (expr <- +any^(semicolon | newline)), (semicolon | newline))
@@ -140,9 +141,9 @@ def _build_parsing_exprs():
 
 parsing_exprs = _build_parsing_exprs()
 
-class NextStmtException(Exception): pass
-
 class PatternActionInterpreter(object):
+    class NextStmt(Exception): pass
+
     def __init__(self):
         self.nr, self.line, self.curFields = None, None, None
         self.varTable = {}
@@ -165,10 +166,14 @@ class PatternActionInterpreter(object):
         try:
             for exprNode, blockNode in patternActions:
                 e0 = exprNode[0]
-                if e0 == "r_BEGIN" and self.nr == 0 or e0 == "r_END" and self.nr == -1 or \
-                        e0 not in ("r_BEGIN", "r_END") and self.nr >= 1 and (exprNode[0] == "expr_empty" or self.eval_expr(exprNode)):
-                    self.exec_stmt(blockNode)
-        except NextStmtException:
+                if e0 == "r_BEGIN":
+                    if self.nr == 0: self.exec_stmt(blockNode)
+                elif e0 == "r_END":
+                    if self.nr == -1: self.exec_stmt(blockNode)
+                else:
+                    if self.nr >= 1 and (e0 == "expr_empty" or self.eval_expr(exprNode)): 
+                        self.exec_stmt(blockNode)
+        except PatternActionInterpreter.NextStmt:
             pass
      
     def eval_expr(self, exprNode):
@@ -285,23 +290,19 @@ class PatternActionInterpreter(object):
         assert False # unknown operator/invalid expression
             
     def exec_stmt(self, stmtNode):
-        if stmtNode and stmtNode[-1][0] in ("newline", "semicolon"):
-            del stmtNode[-1]
-        
-        if len(stmtNode) == 1: # null statement (;)
-            return
-        
+        if stmtNode[-1][0] in ("newline", "semicolon"):
+            stmtNode = stmtNode[:-1]
         if stmtNode[0] == "block_empty":
-            stmtNode = [ "stmt", "r_print" ]
+            stmtNode = [ "stmt", "r_print_empty" ]
         
-        assert len(stmtNode) >= 2
         if stmtNode[0] == "block":
             for stmt in stmtNode[1:]:
                 self.exec_stmt(stmt)
             return
         
         assert stmtNode[0] == "stmt"
-        if stmtNode[1][0] == "r_if":
+        cmdLbl = stmtNode[1][0]
+        if cmdLbl == "r_if":
             seq = stmtNode[2:]
             while seq:
                 assert len(seq) >= 2
@@ -315,24 +316,22 @@ class PatternActionInterpreter(object):
                     break # while seq
                 assert seq[2][0] == "r_elif"
                 seq = seq[3:]
-            return
-        
-        if stmtNode[1][0] == "r_while":
+        elif cmdLbl == "r_while":
             assert len(stmtNode) == 4
             while self.eval_expr(stmtNode[2]) not in (0, ''):
                 self.exec_stmt(stmtNode[3])
-            return
-        
-        if stmtNode[1][0] == "r_print":
-            print self.line if len(stmtNode) == 2 else \
-                " ".join(str(self.eval_expr(v)) for v in stmtNode[2::2])
-            return
-        
-        if stmtNode[1][0] == "r_next":
-            raise NextStmtException
-        
-        assert len(stmtNode) == 2
-        self.eval_expr(stmtNode[1])
+        elif cmdLbl == "r_print":
+            print " ".join(str(self.eval_expr(v)) for v in stmtNode[2::2])
+        elif cmdLbl == "r_print_empty":
+            assert len(stmtNode) == 2
+            print self.line
+        elif cmdLbl == "r_next":
+            assert len(stmtNode) == 2
+            raise PatternActionInterpreter.NextStmt
+        else:
+            if len(stmtNode) == 1: return # null statement (;)
+            assert len(stmtNode) == 2
+            self.eval_expr(stmtNode[1])
 
 def main(debugTrace=False):
     import sys
