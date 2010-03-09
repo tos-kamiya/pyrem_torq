@@ -1,5 +1,5 @@
-Pyremics torqy changelog
-=========================
+Pyremics Torq changelog
+========================
 
 Known Bugs
   - None.
