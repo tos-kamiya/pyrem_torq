@@ -1,15 +1,13 @@
 from itertools import islice
 
-_islist = list.__instancecheck__
-
 def assertion_inpseq_is_empty(inpSeq):
-    try: next(inpSeq)
+    try: inpSeq.next()
     except StopIteration: pass
     else: assert False
 
 def seq_count_leaf_contents(seq):
     def count_i(item):
-        if _islist(item):
+        if isinstance(item, list):
             return sum(map(count_i, islice(item, 1, None)))
         return 1
     return count_i(seq)
@@ -17,7 +15,7 @@ def seq_count_leaf_contents(seq):
 def seq_visit(seq): # yields ( curPos, in_or_out, node (or item) )
     mark_in, mark_out, mark_item = 1, -1, 0
     def seq_visit_i(curPos, item):
-        if not _islist(item):
+        if not isinstance(item, list):
             yield curPos, mark_item, item
         else:
             assert len(item) >= 1
@@ -78,7 +76,7 @@ def seq_pretty(seq):
         i = 1
         while i < len_seq:
             item = seq[i]
-            if _islist(item):
+            if isinstance(item, list):
                 seq_pretty_i(item, newIndent)
                 i += 1
                 continue # while i

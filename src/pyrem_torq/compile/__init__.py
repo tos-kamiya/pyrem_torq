@@ -1,1 +1,1 @@
-from ._compile import *
+from _compile import *

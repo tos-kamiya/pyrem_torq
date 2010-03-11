@@ -12,7 +12,7 @@ to_gsublike_expr = pyrem_torq.expression.Search.build
 def my_compile(exprStr, recursionAtMarker0=True):
     try:
         seq = pyrem_torq.compile.parse_to_ast(exprStr, sys.stderr)
-    except pyrem_torq.expression.InterpretError as e:
+    except pyrem_torq.expression.InterpretError, e:
         raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
     #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     

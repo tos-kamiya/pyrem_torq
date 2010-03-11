@@ -1,6 +1,4 @@
-from ._expression import *
-
-_islist = list.__instancecheck__
+from _expression import *
 
 class __S(object):
     __slots__ = [ '__name' ]
@@ -36,7 +34,7 @@ class Node(TorqExpression):
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] == self.__label:
             if self.__newLabel is FLATTEN:
-                nodeContentIter = iter(lookAheadNode); next(nodeContentIter)
+                nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
                 return 1, nodeContentIter, ()
             elif self.__newLabel is None:
                 return 1, ( lookAheadNode, ), ()
@@ -78,7 +76,7 @@ class AnyNode(TorqExpression):
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if self.__newLabel is FLATTEN:
-            nodeContentIter = iter(lookAheadNode); next(nodeContentIter)
+            nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
             return 1, nodeContentIter, ()
         elif self.__newLabel is None:
             return 1, ( lookAheadNode, ), ()
@@ -131,8 +129,8 @@ class NodeMatch(TorqExpressionWithExpr):
                 r = self._expr._match_eon(lookAheadNode, 1, None)
             else:
                 lah = lookAheadNode[1]
-                r = (self._expr._match_node if _islist(lah) else self._expr._match_lit)(lookAheadNode, 1, lah)
-        except InterpretError as e:
+                r = (self._expr._match_node if isinstance(lah, list) else self._expr._match_lit)(lookAheadNode, 1, lah)
+        except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
         p, o, d = r
@@ -182,8 +180,8 @@ class AnyNodeMatch(TorqExpressionWithExpr):
                 r = self._expr._match_eon(lookAheadNode, 1, None)
             else:
                 lah = lookAheadNode[1]
-                r = (self._expr._match_node if _islist(lah) else self._expr._match_lit)(lookAheadNode, 1, lah)
-        except InterpretError as e:
+                r = (self._expr._match_node if isinstance(lah, list) else self._expr._match_lit)(lookAheadNode, 1, lah)
+        except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
         p, o, d = r
@@ -229,7 +227,7 @@ class NodeClass(TorqExpression):
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] in self.__labels:
             if self.__newLabel is FLATTEN:
-                nodeContentIter = iter(lookAheadNode); next(nodeContentIter)
+                nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
                 return 1, nodeContentIter, ()
             elif self.__newLabel is None:
                 return 1, ( lookAheadNode, ), ()
@@ -370,7 +368,7 @@ class Drop(TorqExpressionWithExpr):
         p, o, d = r
         if not d: return p, (), o
         if not o: return p, (), d
-        dropSeq = d if _islist(d) else list(d)
+        dropSeq = d if isinstance(d, list) else list(d)
         dropSeq.extend(o)
         return p, (), dropSeq
     

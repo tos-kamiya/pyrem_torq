@@ -1,8 +1,8 @@
 from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 
-from ._expression import *
-from ._literal_expression import Literal, LiteralClass
-from ._node_expression import Node, NodeClass
+from _expression import *
+from _literal_expression import Literal, LiteralClass
+from _node_expression import Node, NodeClass
 
 _zeroLengthReturnValue = 0, (), ()
 

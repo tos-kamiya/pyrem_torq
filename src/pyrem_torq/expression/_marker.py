@@ -1,4 +1,4 @@
-from ._expression import *
+from _expression import *
 
 class Marker(TorqExpression):
     __slots__ = [ '__name', '__expr' ]
@@ -52,12 +52,10 @@ class Marker(TorqExpression):
     @staticmethod
     def build(name): return Marker(name)
 
-_isMarker = Marker.__instancecheck__
-
 def inner_expr_iter(expr):
     visitedExprIDSet = set()
     def iei_i(e):
-        if _isMarker(e):
+        if isinstance(e, Marker):
             ide = id(e)
             if ide in visitedExprIDSet: return # prevent infinite recursion
             visitedExprIDSet.add(ide)
@@ -70,13 +68,13 @@ def inner_expr_iter(expr):
 
 def inner_marker_iter(expr):
     for e in inner_expr_iter(expr):
-        if _isMarker(e):
+        if isinstance(e, Marker):
             yield e
 
 def __lookup_replaces(expr, *args):
     if len(args) == 2:
         marker, replacementExpr = args
-        targetName = marker.name if _isMarker(marker) else marker
+        targetName = marker.name if isinstance(marker, Marker) else marker
         tbl = { targetName : replacementExpr }
     else:
         assert len(args) == 1
@@ -84,7 +82,7 @@ def __lookup_replaces(expr, *args):
     assert isinstance(tbl, dict)
     
     replaceTable = dict(( marker, replacementExpr ) for marker, replacementExpr in tbl.items()) 
-    targetMarkers = [e for e in inner_expr_iter(expr) if _isMarker(e) and e.name in replaceTable]
+    targetMarkers = [e for e in inner_expr_iter(expr) if isinstance(e, Marker) and e.name in replaceTable]
     return replaceTable, targetMarkers
 
 def assign_marker_expr(expr, *args):
@@ -106,7 +104,7 @@ def update_marker_expr(expr, *args):
 
 def free_marker_iter(expr):
     for e in inner_expr_iter(expr):
-        if _isMarker(e) and e.expr is None:
+        if isinstance(e, Marker) and e.expr is None:
             yield e
 
 def extract_redundant_inners(expr):
@@ -147,7 +145,7 @@ class ExprDict(dict):
     def __update_markers(self, changedItemTbl):
         for k, v in changedItemTbl.items():
             if v is not None:
-                self.__markerTbl[k] = [e for e in inner_expr_iter(v) if _isMarker(e)]
+                self.__markerTbl[k] = [e for e in inner_expr_iter(v) if isinstance(e, Marker)]
             else:
                 self.__markerTbl[k] = []
         for k, ms in self.__markerTbl.items():

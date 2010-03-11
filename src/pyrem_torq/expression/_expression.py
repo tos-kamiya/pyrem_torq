@@ -5,8 +5,6 @@ from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 class InvalidRepetitionCount(ValueError):
     pass
 
-_islist = list.__instancecheck__
-
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
@@ -35,16 +33,16 @@ class TorqExpression(object):
     def match(self, inpSeq, inpPos):
         assert inpPos >= 1
         len_inpSeq = len(inpSeq)
-        assert _islist(inpSeq) and len_inpSeq >= 1
+        assert isinstance(inpSeq, list) and len_inpSeq >= 1
         if inpPos == len_inpSeq:
             r = self._match_eon(inpSeq, inpPos, None)
         else:
             lookAhead = inpSeq[inpPos]
-            r = (self._match_node if _islist(lookAhead) else self._match_lit)(inpSeq, inpPos, lookAhead)
+            r = (self._match_node if isinstance(lookAhead, list) else self._match_lit)(inpSeq, inpPos, lookAhead)
         if r is None: return 0, [], []
         p, o, d = r
         outSeq = []; outSeq.extend(o)
-        dropSeq = d if _islist(d) else list(d)
+        dropSeq = d if isinstance(d, list) else list(d)
         return p, outSeq, dropSeq
     
     def parse(self, inpSeq, dropSeq=None):
@@ -224,14 +222,14 @@ class Seq(TorqExpression):
         p, o, d = r
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos + p
-        outSeq = o if _islist(o) else list(o); o_ex = outSeq.extend
-        dropSeq = d if _islist(d) else list(d); d_ex = dropSeq.extend
+        outSeq = o if isinstance(o, list) else list(o); o_ex = outSeq.extend
+        dropSeq = d if isinstance(d, list) else list(d); d_ex = dropSeq.extend
         for expr in self.__exprs[1:]:
             if curInpPos == len_inpSeq:
                 r = expr._match_eon(inpSeq, curInpPos, None)
             else:
                 lookAhead = inpSeq[curInpPos]
-                r = (expr._match_node if _islist(lookAhead) else expr._match_lit)(inpSeq, curInpPos, lookAhead)
+                r = (expr._match_node if isinstance(lookAhead, list) else expr._match_lit)(inpSeq, curInpPos, lookAhead)
             if r is None: return None
             p, o, d = r
             curInpPos += p
@@ -303,7 +301,7 @@ class Repeat(TorqExpressionWithExpr):
         ul -= self.__lowerLimit
         while count < ul and curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
-            r = (self._expr._match_node if _islist(lookAhead) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
+            r = (self._expr._match_node if isinstance(lookAhead, list) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
             if r is None:
                 if count < 0: return None
                 break # for count
@@ -319,7 +317,7 @@ class Repeat(TorqExpressionWithExpr):
             p, o, d = r
             #assert p == 0
             #assert not d
-            if not _islist(o): o = list(o)
+            if not isinstance(o, list): o = list(o)
             o_xt(o * -count)
         return curInpPos - inpPos, outSeq, dropSeq
     
@@ -333,7 +331,7 @@ class Repeat(TorqExpressionWithExpr):
         #assert p == 0
         #assert not d
         if self.__lowerLimit != 0:
-            if not _islist(o): o = list(o)
+            if not isinstance(o, list): o = list(o)
             return 0, o * self.__lowerLimit, ()
         return _zeroLengthReturnValue
     
@@ -402,7 +400,7 @@ class Search(TorqExpressionWithExpr):
         dropSeq = []; d_xt = dropSeq.extend
         while curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
-            r = (self._expr._match_node if _islist(lookAhead) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
+            r = (self._expr._match_node if isinstance(lookAhead, list) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
             if r is not None:
                 p, o, d = r
                 curInpPos += p

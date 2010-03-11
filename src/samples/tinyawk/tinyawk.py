@@ -346,7 +346,10 @@ def main(debugTrace=False):
     inputFile = sys.argv[3] if len(sys.argv) == 4 else None
     debugWrite = sys.stderr.write if debugTrace else None
     
-    with open(scriptFile, "r") as f: script = f.read()
+    f = open(scriptFile, "r")
+    try:
+        script = f.read()
+    finally: f.close()
     script = script + "\n" # prepare for missing new-line char at the last line
     
     # parsing

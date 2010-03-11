@@ -105,7 +105,7 @@ class Rex(TorqExpression):
             flags = re.DOTALL
             if ignoreCase: flags |= re.IGNORECASE
             pat = re.compile(exprStr, flags)
-        except Exception as e:
+        except Exception, e:
             raise RexCompilationUnable("invalid regex string: %s" % repr(exprStr))
         self.__expression_match = pat.match
         self.__expressionstr = exprStr

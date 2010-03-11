@@ -16,7 +16,7 @@ def compiling(exprLine):
     print "exprLine=", exprLine
     try:
         seq = pyrem_torq.compile.parse_to_ast(exprLine, sys.stderr)
-    except pyrem_torq.expression.InterpretError as e:
+    except pyrem_torq.expression.InterpretError, e:
         raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     exprs = pyrem_torq.compile.convert_to_expression_object(seq)

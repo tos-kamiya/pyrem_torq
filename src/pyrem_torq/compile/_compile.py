@@ -397,7 +397,7 @@ def convert_to_expression_object(seq, replaces=None):
 def compile(src, recursionAtMarker0=True, replaces=None):
     try:
         seq = parse_to_ast(src)
-    except _pte.InterpretError as e:
+    except _pte.InterpretError, e:
         raise CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     
     exprs = convert_to_expression_object(seq, replaces=replaces)

@@ -1,6 +1,6 @@
 import re, collections
 from pyrem_torq.expression import *
-from pyrem_torq.expression_shortname import BtN, L, LC, M, NM
+from pyrem_torq.extra.expression_shortname import BtN, L, LC, M, NM
 import pyrem_torq.treeseq as ptt
 
 def tokenize(text):
