@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
         seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
         
         for expr in exprs:
-            newSeq = exprs[0].parse(seq)
+            newSeq = expr.parse(seq)
             self.assertTrue(newSeq)
             seq = newSeq
         

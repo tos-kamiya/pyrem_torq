@@ -43,7 +43,7 @@ def _build_parsing_exprs():
     | (comma <- ",") | (semicolon <- ";")
     | (newline <- "\r\n" | "\r" | "\n")
     | (nul <- r"^[ \t#]")
-    | any, err("invalid character")
+    | any, err("unexpected character")
     ;""")[0])
     descAndExprs.append(( "identify reserved words, literals, identifiers", e ))
     
@@ -75,10 +75,12 @@ def _build_parsing_exprs():
     # parse statements
     getSimpleStmt = compile(r"""
     (stmt <- 
-        semicolon 
-        | r_print_empty, (semicolon | newline)
+        (r_null_statement <-), semicolon 
+        | (r_print_empty <- r_print), (semicolon | newline)
         | r_print, (expr <- +any^(semicolon | newline)), (semicolon | newline)
+        | r_print, err("invalid print statement")
         | r_next, (semicolon | newline)
+        | r_next, err("invaild 'next' statement")
         | (expr <- +any^(semicolon | newline)), (semicolon | newline))
     ;""")[0]
     e = Search(compile(r"""
@@ -86,12 +88,15 @@ def _build_parsing_exprs():
         (r_if, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt),
         *((r_elif <- r_else, r_if), (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt)),
         ?(r_else, ((block :: ~@0) | @getSimpleStmt))))
-    | r_else, err("'else' doesn't have a matching 'if'") 
+    | r_if, err("invalid 'if' statement") | r_else, err("'else' doesn't have a matching 'if'") 
     | (stmt <- r_while, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ((block :: ~@0) | @getSimpleStmt))
+    | r_while, err("invalid 'while' statement")
     | @getSimpleStmt
     | (nul <- newline)
+    | semicolon, err("unexpected semicolon (;)")
     | (block :: ~@0) 
     | (pa :: (r_BEGIN | r_END | expr_empty | expr), (block :: ~@0))
+    | any, err("unexpected token")
     ;""", replaces={ 'getSimpleStmt' : getSimpleStmt })[0])
     descAndExprs.append(( "parse statements", e ))
     
@@ -194,12 +199,9 @@ class PatternActionInterpreter(object):
         if exprNode[0] != "expr":
             assert len(exprNode) == 2
             lbl, val = exprNode[0], exprNode[1]
-            if lbl == "id": 
-                return self.varTable[val] # may raise KeyError
-            elif lbl == "l_integer": 
-                return int(val)
-            elif lbl == "l_string": 
-                return val[1:-1] # remove enclosing double quotes.
+            if lbl == "id": return self.varTable[val] # may raise KeyError
+            elif lbl == "l_integer": return int(val)
+            elif lbl == "l_string": return val[1:-1] # remove enclosing double quotes.
             elif lbl == "l_regex": 
                 reString = val[1:-1] # remove /-chars.
                 return 1 if re.match(reString, self.line) else 0
@@ -310,31 +312,26 @@ class PatternActionInterpreter(object):
         if cmdLbl == "r_if":
             seq = stmtNode[2:]
             while seq:
-                assert len(seq) >= 2
                 if self.eval_expr(seq[0]) not in (0, ''):
                     self.exec_stmt(seq[1])
                     break # while seq
                 if len(seq) == 2: break # while seq
                 if seq[2][0] == "r_else":
-                    assert len(seq) == 4
                     self.exec_stmt(seq[3])
                     break # while seq
-                assert seq[2][0] == "r_elif"
                 seq = seq[3:]
         elif cmdLbl == "r_while":
-            assert len(stmtNode) == 4
             while self.eval_expr(stmtNode[2]) not in (0, ''):
                 self.exec_stmt(stmtNode[3])
         elif cmdLbl == "r_print":
             print " ".join(str(self.eval_expr(v)) for v in stmtNode[2::2])
         elif cmdLbl == "r_print_empty":
-            assert len(stmtNode) == 2
             print self.line
         elif cmdLbl == "r_next":
-            assert len(stmtNode) == 2
             raise PatternActionInterpreter.NextStmt
+        elif cmdLbl == "r_null_statement":
+            pass
         else:
-            if len(stmtNode) == 1: return # null statement (;)
             assert len(stmtNode) == 2
             self.eval_expr(stmtNode[1])
 

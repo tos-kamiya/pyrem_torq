@@ -2,14 +2,12 @@ import itertools
 
 from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 
-class InvalidRepetitionCount(ValueError):
-    pass
+class InvalidRepetitionCount(ValueError): pass
 
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
     def __add__(self, other): return Seq.build(self, other)
-    
     def __or__(self, other): return Or.build(self, other)
     
     def __rmul__(self, left):
@@ -41,22 +39,18 @@ class TorqExpression(object):
             r = (self._match_node if isinstance(lookAhead, list) else self._match_lit)(inpSeq, inpPos, lookAhead)
         if r is None: return 0, [], []
         p, o, d = r
-        outSeq = []; outSeq.extend(o)
-        dropSeq = d if isinstance(d, list) else list(d)
-        return p, outSeq, dropSeq
+        if not isinstance(o, list): o = list(o)
+        if not isinstance(d, list): d = list(d)
+        return p, o, d
     
     def parse(self, inpSeq, dropSeq=None):
-        posDelta, outSeq, _dropSeq = self.match(inpSeq, 1)
-        if 1 + posDelta != len(inpSeq): return None
-        if dropSeq is not None: dropSeq.append(_dropSeq)
-        newSeq = [ inpSeq[0] ]
-        newSeq.extend(outSeq)
+        p, o, d = self.match(inpSeq, 1)
+        if 1 + p != len(inpSeq): return None
+        if dropSeq is not None: dropSeq.extend(o)
+        newSeq = [ inpSeq[0] ]; newSeq.extend(o)
         return newSeq
     
-    def _match_node(self, inpSeq, inpPos, lookAhead):
-        pass
-        # return None
-    
+    def _match_node(self, inpSeq, inpPos, lookAhead): pass # return None
     _match_lit = _match_eon = _match_node
     
     def required_node_literal_epsilon(self):
@@ -66,20 +60,19 @@ class TorqExpression(object):
         # if the expression can't assure such items, then just reruns None.
         return None
     
-    def __eq__(self, right): 
-        if not isinstance(right, self.__class__): return False
-        subexprs = list(self.extract_exprs()) if hasattr(self, "extract_exprs") else []
-        rsubexprs =  list(right.extract_exprs()) if hasattr(self, "extract_exprs") else []
-        return subexprs == rsubexprs
+    @staticmethod
+    def __call_extract_exprs_if_having(self):
+        return list(self.extract_exprs()) if hasattr(self, "extract_exprs") else []
+    
+    def __eq__(self, right):
+        ex = TorqExpression.__call_extract_exprs_if_having
+        return isinstance(right, self.__class__) and ex(self) == ex(right)
     
     def __repr__(self): 
-        if hasattr(self, "extract_exprs"):
-            return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, self.extract_exprs())) )
-        else:
-            return "%s()" % self.__class__.__name__
+        return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, TorqExpression.__call_extract_exprs_if_having(self))) )
         
     def __hash__(self):
-        return hash(self.__class__.__name__) + sum(hash(e) for e in self.extract_exprs())
+        return hash(self.__class__.__name__) + sum(hash(e) for e in TorqExpression.__call_extract_exprs_if_having(self))
 
 class TorqExpressionWithExpr(TorqExpression):
     __slots__ = [ '_expr', '_expr_match_node', '_expr_match_lit', '_expr_match_eon' ]
@@ -178,11 +171,9 @@ class Or(TorqExpression):
                 mergedExprs[-1] = m
             else:
                 mergedExprs.append(e)
-        if not mergedExprs: 
-            return Never()
-        if len(mergedExprs) == 1:
-            return mergedExprs[0]
-        return Or(*mergedExprs)
+        return Never() if not mergedExprs else \
+                 mergedExprs[0] if len(mergedExprs) == 1 else \
+                 Or(*mergedExprs)
 
 def _seqflatener(exprs):
     for e in exprs:
@@ -224,8 +215,8 @@ class Seq(TorqExpression):
         p, o, d = r
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos + p
-        outSeq = o if isinstance(o, list) else list(o); o_ex = outSeq.extend
-        dropSeq = d if isinstance(d, list) else list(d); d_ex = dropSeq.extend
+        outSeq = o if isinstance(o, list) else list(o); o_xt = outSeq.extend
+        dropSeq = d if isinstance(d, list) else list(d); d_xt = dropSeq.extend
         for expr in self.__exprs[1:]:
             if curInpPos == len_inpSeq:
                 r = expr._match_eon(inpSeq, curInpPos, None)
@@ -234,9 +225,7 @@ class Seq(TorqExpression):
                 r = (expr._match_node if isinstance(lookAhead, list) else expr._match_lit)(inpSeq, curInpPos, lookAhead)
             if r is None: return None
             p, o, d = r
-            curInpPos += p
-            o_ex(o)
-            d_ex(d)
+            curInpPos += p; o_xt(o); d_xt(d)
         return curInpPos - inpPos, outSeq, dropSeq
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
@@ -271,11 +260,9 @@ class Seq(TorqExpression):
                 mergedExprs[-1] = m
             else:
                 mergedExprs.append(e)
-        if not mergedExprs:
-            return Epsilon()
-        if len(mergedExprs) == 1:
-            return mergedExprs[0]
-        return Seq(*mergedExprs)
+        return Epsilon() if not mergedExprs else \
+                 mergedExprs[0] if len(mergedExprs) == 1 else \
+                 Seq(*mergedExprs)
 
 class Repeat(TorqExpressionWithExpr):
     __slots__ = [ '__lowerLimit', '__upperLimit', '__rnle' ]
@@ -309,9 +296,7 @@ class Repeat(TorqExpressionWithExpr):
                 break # for count
             p, o, d = r
             if p == 0 and count >= 0: break # in order to avoid infinite loop
-            curInpPos += p
-            o_xt(o)
-            d_xt(d)
+            curInpPos += p; o_xt(o); d_xt(d)
             count += 1
         if curInpPos == len_inpSeq and count < 0:
             r = self._expr._match_eon(inpSeq, inpPos, None)
@@ -405,9 +390,7 @@ class Search(TorqExpressionWithExpr):
             r = (self._expr._match_node if isinstance(lookAhead, list) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
             if r is not None:
                 p, o, d = r
-                curInpPos += p
-                o_xt(o)
-                d_xt(d)
+                curInpPos += p; o_xt(o); d_xt(d)
             if r is None or p == 0:
                 curInpPos += 1
                 o_ap(lookAhead)
@@ -471,7 +454,6 @@ class Epsilon(TorqExpression): # singleton
     _match_lit = _match_eon = _match_node
 
     def required_node_literal_epsilon(self): return (), (), True
-    
     def seq_merged(self, other): return other
     def or_merged(self, other): return self
     
