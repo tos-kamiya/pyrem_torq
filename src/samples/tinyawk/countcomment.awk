@@ -15,7 +15,8 @@ BEGIN {
     othersCount = othersCount + 1
 }
 END {
-    print "comment lines: ", commentLineCount
-    print "empty lines: ", emptyLineCount
-    print "other lines: ", othersCount
+    L = " lines:"
+    print "comment" L, commentLineCount
+    print "empty" L, emptyLineCount
+    print "other" L, othersCount
 }

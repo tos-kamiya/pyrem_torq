@@ -25,10 +25,10 @@ def compiling(exprLine):
 
 class TestTorqComile(unittest.TestCase):
     def test1st(self):
-        compiling('text :: (v <- +(r"^\d" | ".")) | (null <- +(" " | ">"));')
+        compiling('text :: (v <- +(r"^\d" | ".")) | (nul <- +(" " | ">"));')
         
     def test2nd(self):
-        compiling('text :: (v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));')
+        compiling('text :: (v <- (nul <- "("), +(@0 | xcp("(" | ")"), any), (nul <- ")"));')
     
     def test3rd(self):
         compiling('text :: ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), *(xcp(v), any, ?(v <- (u_op <- "+" | "-"), (v :: ~@0)) | (v :: ~@0));')
@@ -89,6 +89,11 @@ class TestTorqComile(unittest.TestCase):
         exprs3 = compiling(exprStr3)
         self.assertNotEqual(exprs1, exprs2)
         self.assertEqual(exprs1, exprs3)
+    
+    def test17th(self):
+        expr1 = compiling('"a", err("should not a");')
+        expr2 = compiling('"a", err "should not a";')
+        self.assertEqual(expr1, expr2)
     
 if __name__ == '__main__':
     unittest.main()

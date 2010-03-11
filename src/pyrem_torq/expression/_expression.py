@@ -68,13 +68,15 @@ class TorqExpression(object):
     
     def __eq__(self, right): 
         if not isinstance(right, self.__class__): return False
-        subexprs = list(self.extract_exprs())
-        if subexprs: return subexprs == list(right.extract_exprs())
+        subexprs = list(self.extract_exprs()) if hasattr(self, "extract_exprs") else []
+        rsubexprs =  list(right.extract_exprs()) if hasattr(self, "extract_exprs") else []
+        return subexprs == rsubexprs
     
     def __repr__(self): 
-        subexprs = list(self.extract_exprs())
-        return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, subexprs)) ) if subexprs else \
-                "%s()" % self.__class__.__name__
+        if hasattr(self, "extract_exprs"):
+            return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, self.extract_exprs())) )
+        else:
+            return "%s()" % self.__class__.__name__
         
     def __hash__(self):
         return hash(self.__class__.__name__) + sum(hash(e) for e in self.extract_exprs())
@@ -440,17 +442,24 @@ class InterpretError(StandardError):
     def __repr__(self):
         return "InterpretError(%s,%s)" % ( repr(self.message), repr(self.stack) )
 
+class InterpretErrorByErrorExpr(InterpretError):
+    def __repr__(self):
+        return "InterpretErrorByErrorExpr(%s,%s)" % ( repr(self.message), repr(self.stack) )
+    
 class ErrorExpr(TorqExpression):
     def __init__(self, message):
         self.message = message
     
     def _match_node(self, inpSeq, inpPos, lookAhead):
-        e = InterpretError(self.message)
+        e = InterpretErrorByErrorExpr(self.message)
         e.stack.insert(0, inpPos)
         raise e
         
     _match_lit = _match_eon = _match_node
     
+    def __repr__(self): return "ErrorExpr(%s)" % repr(self.message)
+    def __hash__(self): return hash("ErrorExpr") + hash(self.message)
+
     @staticmethod
     def build(message): return ErrorExpr(message)
 

@@ -17,11 +17,12 @@ import pyrem_torq.treeseq as ptt # for debug code
 
 def tokenize(text):
     p = "|".join([
-        r"/[^/\n]*/", r'"[^"\n]*"', r"\d+", # literals (regex, string, integer)
-        r"#[^\n]*", # comment
-        r"[ \t]+", r"\n", # white spaces, newline
+        r"/[^/\r\n]*/", r'"[^"\r\n]*"', r"\d+", # literals (regex, string, integer)
+        r"#[^\r\n]*", # comment
+        r"[ \t]+", r"\r\n|\r|\n", # white spaces, newline
         r"[a-zA-Z_](\w|_)*", # identifier
-        r"[<>!=]=|&&|[|][|]", r"[-+*/%<>!=()${},;]|\[|\]" # operators
+        r"[<>!=]=|&&|[|][|]", r"[-+*/%<>!=()${},;]|\[|\]", # operators
+        r"." # invalid chars
     ])
     return [ 'code' ] + [m.group() for m in re.finditer(p, text)]
 
@@ -40,29 +41,33 @@ def _build_parsing_exprs():
     | (op_assign <- "=") | (op_not <- "!") | (op_dollar <- "$")
     | (LP <- "(") | (RP <- ")") | (LB <- "{") | (RB <- "}") | (LK <- "[") | (RK <- "]")
     | (comma <- ",") | (semicolon <- ";")
-    | (null <- r"^[ \t#]")
+    | (newline <- "\r\n" | "\r" | "\n")
+    | (nul <- r"^[ \t#]")
+    | any, err("invalid character")
     ;""")[0])
     descAndExprs.append(( "identify reserved words, literals, identifiers", e ))
     
     # identify statement-terminating new-line chars
     e = Search(compile(r"""
-    (comma | LB | op_or | op_and | r_else), (null <- +"\n")
-    | (newline <- "\n")
+    (comma | LB | op_or | op_and | r_else), (nul <- newline)
     ;""")[0])
     descAndExprs.append(( "remove neglected new-line characters", e ))
     
     # parse pattern-actions and blocks.
-    stmtLevelBlock = compile("(block <- (null <- LB), *(xcp(RB), @0), (null <- RB)) | any;")[0]
+    stmtLevelBlock = compile("""
+    (block <- (nul <- LB), *(xcp(RB), @0), (nul <- RB)) 
+    | any
+    ;""")[0]
     actionLevelBlock = compile(r"""
     (pa <- 
         ((r_BEGIN | r_END) | (expr_empty <-)),
-        (block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)), 
-        (null <- newline))
+        (block <- (nul <- LB), *(xcp(RB), @stmtLevelBlock), (nul <- RB)), 
+        (nul <- newline))
     | (pa <- 
         (expr <- +any^(LB | newline)), 
-        ((block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
-        (null <- newline))
-    | (null <- newline)
+        ((block <- (nul <- LB), *(xcp(RB), @stmtLevelBlock), (nul <- RB)) | (block_empty <-)),
+        (nul <- newline))
+    | (nul <- newline)
     ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })[0]
     e = [0,None] * actionLevelBlock
     descAndExprs.append(( "parse pattern-actions and blocks", e ))
@@ -78,12 +83,13 @@ def _build_parsing_exprs():
     ;""")[0]
     e = Search(compile(r"""
     (stmt <- 
-        (r_if, (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt),
-        *((r_elif <- r_else, r_if), (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt)),
+        (r_if, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt),
+        *((r_elif <- r_else, r_if), (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt)),
         ?(r_else, ((block :: ~@0) | @getSimpleStmt))))
-    | (stmt <- r_while, (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ((block :: ~@0) | @getSimpleStmt))
+    | r_else, err("'else' doesn't have a matching 'if'") 
+    | (stmt <- r_while, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ((block :: ~@0) | @getSimpleStmt))
     | @getSimpleStmt
-    | (null <- newline)
+    | (nul <- newline)
     | (block :: ~@0) 
     | (pa :: (r_BEGIN | r_END | expr_empty | expr), (block :: ~@0))
     ;""", replaces={ 'getSimpleStmt' : getSimpleStmt })[0])
@@ -126,15 +132,21 @@ def _build_parsing_exprs():
     
     descAndExprs.append(( "remove redundant paren", Search(compile("""
     req(expr :: expr | l_integer | l_string | l_regex | id), (<>expr :: @0)
-    | (expr :: ~@0) | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
+    | (expr :: id, LK, *(xcp(RK), @0), RK) 
+    | (expr :: ~@0) 
+    | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
+    | LB, err("unclosed '{'") | RB, err("unexpected '}'")
+    | LP, err("unclosed '('") | RP, err("unexpected ')'")
+    | id, LK, err("unclosed '['") | LK, err("unexpected '['") | RK, err("unexpected ']'")
     | any
     ;""")[0]) ))
     
     someExpr = compile("(l_integer | l_string | l_regex | id | (expr :: ~@0));")[0]
     descAndExprs.append(( "reform comma expressions", Search(compile("""
     (r_print, (<>expr :: @someExpr, +(comma, @someExpr)))
-    | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((null <- comma), @someExpr), RK))
+    | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((nul <- comma), @someExpr), RK))
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
+    | comma, err("unexpected comma (,)") 
     ;""", replaces={ "someExpr" : someExpr })[0]) ))
     
     return descAndExprs
@@ -214,9 +226,7 @@ class PatternActionInterpreter(object):
         assert len(seq) >= 3
         seq1lbl = seq[1][0]
         if seq1lbl == "LK": # a[...]
-            assert seq[0][0] == "id"
-            assert seq[-1][0] == "RK"
-            assert len(filter(lambda n: n[0] == "LK", seq)) == 1
+            #assert seq[0][0] == "id"; assert seq[-1][0] == "RK"
             indexStr = "\t".join(str(self.eval_expr(v)) for v in seq[2::2])
             var = self.varTable.setdefault(seq[0][1], {})
             return var.setdefault(indexStr, "")
@@ -274,18 +284,13 @@ class PatternActionInterpreter(object):
                 if e[0] == "id":
                     self.varTable[e[1]] = assingedValue
                 elif e[0] == "expr" and len(e) >= 5 and e[2][0] == "LK":
-                    assert e[1][0] == "id"
-                    assert e[-1][0] == "RK"
-                    assert len(filter(lambda n: n[0] == "LK", e)) == 1
+                    #assert e[1][0] == "id"; assert e[-1][0] == "RK"
                     indexStr = "\t".join(str(self.eval_expr(v)) for v in e[3::2])
                     var = self.varTable.setdefault(e[1][1], {})
                     var[indexStr] = assingedValue
                 else:
                     assert False # invalid l-value
             return assingedValue
-        
-        if seq1lbl == "comma":
-            assert False # a comma appears outside of [] or a print statement
         
         assert False # unknown operator/invalid expression
             
@@ -358,7 +363,9 @@ def main(debugTrace=False):
         if debugWrite:
             debugWrite("\n".join(ptt.seq_pretty(seq)) + "\n") # prints a seq
             debugWrite("step: %s\n" % desc)
-        newSeq = expr.parse(seq)
+        try:
+            newSeq = expr.parse(seq)
+        except InterpretError, e: print repr(e); raise e
         if newSeq is None: raise SystemError
         seq = newSeq
     if debugWrite: debugWrite("\n".join(ptt.seq_pretty(seq)) + "\n") # prints a seq
