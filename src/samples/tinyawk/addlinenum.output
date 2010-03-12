@@ -1,4 +1,0 @@
-1 # add line numbers to a text file.
-2 {
-3     print NR, $0
-4 }

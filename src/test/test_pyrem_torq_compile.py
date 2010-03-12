@@ -6,7 +6,7 @@ Created on 2009/07/22
 
 import sys
 
-import pyrem_torq.compile
+import pyrem_torq.script
 import pyrem_torq.expression
 import pyrem_torq.treeseq
 
@@ -15,11 +15,11 @@ import unittest
 def compiling(exprLine):
     print "exprLine=", exprLine
     try:
-        seq = pyrem_torq.compile.parse_to_ast(exprLine, sys.stderr)
+        seq = pyrem_torq.script.parse_to_ast(exprLine, sys.stderr)
     except pyrem_torq.expression.InterpretError, e:
-        raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
+        raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
-    exprs = pyrem_torq.compile.convert_to_expression_object(seq)
+    exprs = pyrem_torq.script.convert_to_expression_object(seq)
     print "exprs=", exprs
     return exprs
 
@@ -48,7 +48,7 @@ class TestTorqComile(unittest.TestCase):
     | (word <- +(h"a" | "_"))
     | (multiline_comment <- "/", "*" *(xcp("*", "/"), any), "*", "/");
 """
-        self.assertRaises(pyrem_torq.compile.CompileError, compiling, exprStr)
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, exprStr)
     
 #    def test8th(self):
 #        exprStr = "insert(hoge)"

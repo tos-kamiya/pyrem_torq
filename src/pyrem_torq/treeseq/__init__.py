@@ -1,1 +1,1 @@
-from _treeseq_funcs import *
+from treeseq_funcs import *

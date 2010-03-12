@@ -2,7 +2,7 @@ import sys, re
 
 from pyrem_torq.utility import split_to_strings_iter
 import pyrem_torq.expression
-import pyrem_torq.compile
+import pyrem_torq.script
 import pyrem_torq.treeseq
 
 import unittest
@@ -11,12 +11,12 @@ to_gsublike_expr = pyrem_torq.expression.Search.build
 
 def my_compile(exprStr, recursionAtMarker0=True):
     try:
-        seq = pyrem_torq.compile.parse_to_ast(exprStr, sys.stderr)
+        seq = pyrem_torq.script.parse_to_ast(exprStr, sys.stderr)
     except pyrem_torq.expression.InterpretError, e:
-        raise pyrem_torq.compile.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
+        raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
     #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
-    exprs = pyrem_torq.compile.convert_to_expression_object(seq)
+    exprs = pyrem_torq.script.convert_to_expression_object(seq)
     
     if recursionAtMarker0:
         for expr in exprs:
@@ -27,7 +27,7 @@ def my_compile(exprStr, recursionAtMarker0=True):
 def compile_exprs(exprStrs):
     exprs = []
     for exprStr in exprStrs:
-        expr = pyrem_torq.compile.compile(exprStr, recursionAtMarker0=True)
+        expr = pyrem_torq.script.compile(exprStr, recursionAtMarker0=True)
         #expr = my_compile(exprStr, recursiionAtMarker0=True)
         
         assert len(expr) == 1

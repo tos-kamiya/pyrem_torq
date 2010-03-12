@@ -5,7 +5,7 @@ packages = [
     "pyrem_torq.utility",
     "pyrem_torq.treeseq",
     "pyrem_torq.expression",
-    "pyrem_torq.compile",
+    "pyrem_torq.script",
     "pyrem_torq.extra"
 ]
 

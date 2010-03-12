@@ -10,10 +10,10 @@
 # - assignment to NF, NR or $* is undefined behavior.
 
 import re
-from pyrem_torq.compile import compile
+import pyrem_torq
 from pyrem_torq.expression import *
-from pyrem_torq.extra.operator_builer import OperatorBuilder
 import pyrem_torq.treeseq as ptt # for debug code
+compile = pyrem_torq.script.compile
 
 def tokenize(text):
     p = "|".join([
@@ -103,7 +103,7 @@ def _build_parsing_exprs():
     # build expression parser
     def build_expression_parser():
         n = Node
-        kit = OperatorBuilder()
+        kit = pyrem_torq.extra.operator_builer.OperatorBuilder()
         kit.atomic_term_expr = Or(n("l_integer"), n("l_string"), n("l_regex"), n("id"))
         kit.composed_term_node_labels = ( "expr", )
         kit.generated_term_label = "expr"
@@ -158,40 +158,47 @@ def _build_parsing_exprs():
 
 parsing_exprs = _build_parsing_exprs()
 
-class PatternActionInterpreter(object):
+class Interpreter(object):
     class NextStmt(Exception): pass
 
-    def __init__(self):
+    def __init__(self, ast):
+        self.patternActions = [( paNode[1], paNode[2] ) for paNode in ast[1:]]
         self.nr, self.line, self.curFields = None, None, None
         self.varTable = {}
     
-    def set_begin(self): 
+    def do_begin(self): 
         self.nr, self.line, self.curFields = 0, None, []
         self.varTable.update([ ( "NR", self.nr ), ( "NF", 0 ) ])
+        try:
+            self._exec()
+        except Interpreter.NextStmt:
+            raise SystemError("next statement in BEGIN action")
             
-    def set_end(self):
+    def do_end(self):
         self.nr, self.line, self.curFields = -1, None, []
         self.varTable.update([ ( "NF", 0 ) ])
+        self._exec()
     
-    def set_line(self, nr, line):
+    def do_line(self, nr, line):
         assert nr >= 1
         fields = line.split()
         self.nr, self.line, self.curFields = nr, line, [ line ] + fields
         self.varTable.update([ ( "NR", self.nr ), ( "NF", len(fields) ) ])
+        self._exec()
 
-    def exec_pattern_actions(self, patternActions):
-        try:
-            for exprNode, blockNode in patternActions:
-                e0 = exprNode[0]
-                if e0 == "r_BEGIN":
-                    if self.nr == 0: self.exec_stmt(blockNode)
-                elif e0 == "r_END":
-                    if self.nr == -1: self.exec_stmt(blockNode)
-                else:
+    def _exec(self):
+        for exprNode, blockNode in self.patternActions:
+            e0 = exprNode[0]
+            if e0 == "r_BEGIN":
+                if self.nr == 0: self.exec_stmt(blockNode)
+            elif e0 == "r_END":
+                if self.nr == -1: self.exec_stmt(blockNode)
+            else:
+                try:
                     if self.nr >= 1 and (e0 == "expr_empty" or self.eval_expr(exprNode)): 
                         self.exec_stmt(blockNode)
-        except PatternActionInterpreter.NextStmt:
-            pass
+                except Interpreter.NextStmt:
+                    break # for 
      
     def eval_expr(self, exprNode):
         def cast_to_int(s): return 0 if not s else int(s) # an empty string is converted to 0
@@ -328,7 +335,7 @@ class PatternActionInterpreter(object):
         elif cmdLbl == "r_print_empty":
             print self.line
         elif cmdLbl == "r_next":
-            raise PatternActionInterpreter.NextStmt
+            raise Interpreter.NextStmt
         elif cmdLbl == "r_null_statement":
             pass
         else:
@@ -340,7 +347,7 @@ def main(debugTrace=False):
     
     if len(sys.argv) == 1:
         print "usage: tinyawk -f <script> [ <input> ]\nAn interpreter of a awk-like small language."
-        sys.exit(0)
+        return
     
     assert len(sys.argv) in (3, 4)
     assert sys.argv[1] == "-f"
@@ -363,28 +370,21 @@ def main(debugTrace=False):
         try:
             newSeq = expr.parse(seq)
         except InterpretError, e: print repr(e); raise e
-        if newSeq is None: raise SystemError
+        if newSeq is None: raise SystemError("parse error")
         seq = newSeq
     if debugWrite: debugWrite("\n".join(ptt.seq_pretty(seq)) + "\n") # prints a seq
 
     # interpretation
-    patternActions = [( paNode[1], paNode[2] ) for paNode in seq[1:]]
-    interp = PatternActionInterpreter()
-    interp.set_begin()
-    interp.exec_pattern_actions(patternActions)
-    if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
-    
-    if any(e[0] not in ("r_BEGIN", "r_END") for e, b in patternActions):
-        f = open(inputFile, "r") if inputFile else sys.stdin
-        for lnum, L in enumerate(f):
-            interp.set_line(lnum+1, L.rstrip())
-            interp.exec_pattern_actions(patternActions)
-            if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
-        if inputFile: f.close()
-    
-    interp.set_end()
-    interp.exec_pattern_actions(patternActions)
-    if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
+    interp = Interpreter(seq)
+    def dbgwrite(): 
+        if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
+
+    interp.do_begin(); dbgwrite()
+    f = open(inputFile, "r") if inputFile else sys.stdin
+    for lnum, L in enumerate(f):
+        interp.do_line(lnum+1, L.rstrip()); dbgwrite()
+    if inputFile: f.close()
+    interp.do_end(); dbgwrite()
 
 if __name__ == '__main__':
     main(debugTrace=True)
