@@ -53,7 +53,7 @@ def parse_to_ast(s, verboseOutput=None):
             
             # operators
             rst("insert_subtree", "<", "-"),
-            rst("nul", "nul"),
+            rst('null', 'null'),
             rst("comma", ","), rst("semicolon", ";"),
             rst("matches", ":", ":"), rst("anybut", "any", "^"),
             rst("LP", "("), rst("RP", ")"), 
@@ -83,7 +83,7 @@ def parse_to_ast(s, verboseOutput=None):
     verbosePrintTitle('parseReservedWords')
     def parseReservedWords(seq):
         def rw(name): return NM('id', L(name), newLabel=name) # reserved word
-        reservedWordExpr = rw('req') | rw('xcp') | rw('err') | rw('any') | rw('nul')
+        reservedWordExpr = rw('req') | rw('xcp') | rw('error') | rw('any') | rw('any_node') | rw('null')
         return __parse(seq, reservedWordExpr | A(), "Can't parse reserved words")
     seq = parseReservedWords(seq)
     verbosePrintSeq(seq)    
@@ -103,7 +103,7 @@ def parse_to_ast(s, verboseOutput=None):
     def parseParen(seq):
         ed = _pte.ExprDict()
         parenExpr = ed["parenExpr"] = XtA((N('LP') | N('RP'))) \
-            | BtN('apply', IN('insert_subtree') + _pte.Drop(N('LP')) + (N('id') | N('nul')) + _pte.Drop(N('insert_subtree')) + _pte.Drop(N('RP'))) \
+            | BtN('apply', IN('insert_subtree') + _pte.Drop(N('LP')) + (N('id') | N('null')) + _pte.Drop(N('insert_subtree')) + _pte.Drop(N('RP'))) \
             | BtN('param',  _pte.Drop(N('LP')) + [0,]*M("parenExpr") + _pte.Drop(N('RP')))
         return __parse(seq, parenExpr, "Can't parse parens")
     seq = parseParen(seq)
@@ -116,8 +116,8 @@ def parse_to_ast(s, verboseOutput=None):
         ed = _pte.ExprDict()
         unaryOperatorExpr = ed["unaryOperatorExpr"] = _pte.Or(recurseApplyAndParam(M("unaryOperatorExpr")),
             BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('xcp') | N('req') | N('anybut')) + M("unaryOperatorExpr")),
-            BtN('err', _pte.Drop(N("err")) + N('string_literal', newLabel=_pte.FLATTEN)),
-            BtN('err', _pte.Drop(N("err")) + \
+            BtN('error', _pte.Drop(N('error')) + N('string_literal', newLabel=_pte.FLATTEN)),
+            BtN('error', _pte.Drop(N('error')) + \
                 NM('param', N('string_literal', newLabel=_pte.FLATTEN), newLabel=_pte.FLATTEN)),
             N('diamond') + N('id') + N('matches'), # special form
             BtN('apply', IN("expand") + _pte.Drop(N('diamond')) + N('id')),
@@ -155,7 +155,7 @@ def parse_to_ast(s, verboseOutput=None):
         term = ed["term"] = recurseApplyAndParam(M("assignExpr")) | XtA((N('matches') | N('assign_subtree')))
         assignExpr = ed["assignExpr"] = aopwd('matches') | \
             BtN('apply', IN('matches') + N('id') + _pte.Drop(N('matches')) + M("assignExpr")) | \
-            BtN('apply', IN('insert_subtree') + (N('id') | N('nul')) + _pte.Drop(N('insert_subtree')) + M("assignExpr")) | \
+            BtN('apply', IN('insert_subtree') + (N('id') | N('null')) + _pte.Drop(N('insert_subtree')) + M("assignExpr")) | \
             term
         return __parse(seq, assignExpr, "Can't parse binary operator ASSIGN")
     seq = parseBinaryOperatorAssign(seq)
@@ -286,7 +286,7 @@ def convert_to_expression_object(seq, replaces=None):
     def marker2Label(seq):
         assert seq[0] == 'marker'
         assert len(seq) >= 2
-        if len(seq) == 2 and seq[1] in ("req", "xcp", "nul", "any", "err"):
+        if len(seq) == 2 and seq[1] in ("req", "xcp", 'null', 'any', 'any_node', 'error'):
             return None
         return "".join(seq[1:])
     def id2Label(seq):
@@ -326,13 +326,13 @@ def convert_to_expression_object(seq, replaces=None):
                 return _pte.NodeMatch(label, cnv_i(seq[3]), newLabel=(_pte.FLATTEN if is_flatten else None))
             elif seq1NodeName == 'insert_subtree':
                 if len_seq == 3:
-                    if seq[2][0] == 'nul': raise CompileError("Invalid form. '(nul <- )' is not permitted")
+                    if seq[2][0] == 'null': raise CompileError("Invalid form. '(nul <- )' is not permitted")
                     label = id2Label(seq[2])
                     if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
                     return _pte.InsertNode(label)
                 else:
                     if len_seq != 4: raise CompileError("Invalid InsertNode(<-)", seq1)
-                    if seq[2][0] == 'nul':
+                    if seq[2][0] == 'null':
                         return _pte.Drop(cnv_i(seq[3]))
                     else:
                         label = id2Label(seq[2])
@@ -365,6 +365,9 @@ def convert_to_expression_object(seq, replaces=None):
         elif seq0 == "any":
             assert len_seq == 2
             return _pte.Any()
+        elif seq0 == "any_node":
+            assert len_seq == 2
+            return _pte.AnyNode()
         elif seq0 == 'id':
             label = id2Label(seq)
             if not label: raise CompileError("Invalid Label", seq0)
@@ -376,7 +379,7 @@ def convert_to_expression_object(seq, replaces=None):
             if r is not None:
                 return r
             return _pte.Marker(label)
-        elif seq0 == 'err':
+        elif seq0 == 'error':
             if not(len_seq >= 2): raise CompileError("Empty error message", seq0)
             s = "".join(seq[1:])
             return _pte.ErrorExpr(__unescape(s))

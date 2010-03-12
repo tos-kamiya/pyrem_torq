@@ -231,6 +231,10 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'a' ], [ 'b' ], [ 'c' ] ])
         self.assertFalse(dropSeq)
     
+        seq = [ 'code', 'a', 'b', 'c' ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 0)
+        
     def testAnyNodeMatch(self):
         expr = Repeat(AnyNodeMatch(Literal('X')), 0, None)
         seq = [ 'text', [ 'a', 'X' ], [ 'b', 'X' ], [ 'c', 'Y' ] ]

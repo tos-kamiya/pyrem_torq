@@ -38,8 +38,8 @@ def compile_exprs(exprStrs):
 class TestTorqComileAndInterpret(unittest.TestCase):
     def test1st(self):
         exprStrs = [ 
-            r'~((v <- +(r"^\d" | ".")) | (nul <- +(" " | "\t")));',
-            r'~(v <- (nul <- "("), +(@0 | xcp("(" | ")"), any), (nul <- ")"));',
+            r'~((v <- +(r"^\d" | ".")) | (null <- +(" " | "\t")));',
+            r'~(v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));',
             r"""
                 ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), 
                 *(
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
         
     def test9th(self):
         exprs = compile_exprs([ r"""
-        ~("a", err "literal 'a' should not appear" | any);
+        ~("a", error "literal 'a' should not appear" | any);
         """ ])
         assert len(exprs) == 1
         

@@ -42,32 +42,32 @@ def _build_parsing_exprs():
     | (LP <- "(") | (RP <- ")") | (LB <- "{") | (RB <- "}") | (LK <- "[") | (RK <- "]")
     | (comma <- ",") | (semicolon <- ";")
     | (newline <- "\r\n" | "\r" | "\n")
-    | (nul <- r"^[ \t#]")
-    | any, err("unexpected character")
+    | (null <- r"^[ \t#]")
+    | any, error("unexpected character")
     ;""")[0])
     descAndExprs.append(( "identify reserved words, literals, identifiers", e ))
     
     # identify statement-terminating new-line chars
     e = Search(compile(r"""
-    (comma | LB | op_or | op_and | r_else), (nul <- newline)
+    (comma | LB | op_or | op_and | r_else), (null <- newline)
     ;""")[0])
     descAndExprs.append(( "remove neglected new-line characters", e ))
     
     # parse pattern-actions and blocks.
     stmtLevelBlock = compile("""
-    (block <- (nul <- LB), *(xcp(RB), @0), (nul <- RB)) 
+    (block <- (null <- LB), *(xcp(RB), @0), (null <- RB)) 
     | any
     ;""")[0]
     actionLevelBlock = compile(r"""
     (pa <- 
         ((r_BEGIN | r_END) | (expr_empty <-)),
-        (block <- (nul <- LB), *(xcp(RB), @stmtLevelBlock), (nul <- RB)), 
-        (nul <- newline))
+        (block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)), 
+        (null <- newline))
     | (pa <- 
         (expr <- +any^(LB | newline)), 
-        ((block <- (nul <- LB), *(xcp(RB), @stmtLevelBlock), (nul <- RB)) | (block_empty <-)),
-        (nul <- newline))
-    | (nul <- newline)
+        ((block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
+        (null <- newline))
+    | (null <- newline)
     ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })[0]
     e = [0,None] * actionLevelBlock
     descAndExprs.append(( "parse pattern-actions and blocks", e ))
@@ -78,25 +78,25 @@ def _build_parsing_exprs():
         (r_null_statement <-), semicolon 
         | (r_print_empty <- r_print), (semicolon | newline)
         | r_print, (expr <- +any^(semicolon | newline)), (semicolon | newline)
-        | r_print, err("invalid print statement")
+        | r_print, error("invalid print statement")
         | r_next, (semicolon | newline)
-        | r_next, err("invaild 'next' statement")
+        | r_next, error("invaild 'next' statement")
         | (expr <- +any^(semicolon | newline)), (semicolon | newline))
     ;""")[0]
     e = Search(compile(r"""
     (stmt <- 
-        (r_if, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt),
-        *((r_elif <- r_else, r_if), (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ?(nul <- newline), ((block :: ~@0) | @getSimpleStmt)),
+        (r_if, (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt),
+        *((r_elif <- r_else, r_if), (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt)),
         ?(r_else, ((block :: ~@0) | @getSimpleStmt))))
-    | r_if, err("invalid 'if' statement") | r_else, err("'else' doesn't have a matching 'if'") 
-    | (stmt <- r_while, (nul <- LP), (expr <- +any^(newline | RP)), (nul <- RP), ((block :: ~@0) | @getSimpleStmt))
-    | r_while, err("invalid 'while' statement")
+    | r_if, error("invalid 'if' statement") | r_else, error("'else' doesn't have a matching 'if'") 
+    | (stmt <- r_while, (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ((block :: ~@0) | @getSimpleStmt))
+    | r_while, error("invalid 'while' statement")
     | @getSimpleStmt
-    | (nul <- newline)
-    | semicolon, err("unexpected semicolon (;)")
+    | (null <- newline)
+    | semicolon, error("unexpected semicolon (;)")
     | (block :: ~@0) 
     | (pa :: (r_BEGIN | r_END | expr_empty | expr), (block :: ~@0))
-    | any, err("unexpected token")
+    | any, error("unexpected token")
     ;""", replaces={ 'getSimpleStmt' : getSimpleStmt })[0])
     descAndExprs.append(( "parse statements", e ))
     
@@ -140,18 +140,18 @@ def _build_parsing_exprs():
     | (expr :: id, LK, *(xcp(RK), @0), RK) 
     | (expr :: ~@0) 
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
-    | LB, err("unclosed '{'") | RB, err("unexpected '}'")
-    | LP, err("unclosed '('") | RP, err("unexpected ')'")
-    | id, LK, err("unclosed '['") | LK, err("unexpected '['") | RK, err("unexpected ']'")
+    | LB, error("unclosed '{'") | RB, error("unexpected '}'")
+    | LP, error("unclosed '('") | RP, error("unexpected ')'")
+    | id, LK, error("unclosed '['") | LK, error("unexpected '['") | RK, error("unexpected ']'")
     | any
     ;""")[0]) ))
     
     someExpr = compile("(l_integer | l_string | l_regex | id | (expr :: ~@0));")[0]
     descAndExprs.append(( "reform comma expressions", Search(compile("""
     (r_print, (<>expr :: @someExpr, +(comma, @someExpr)))
-    | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((nul <- comma), @someExpr), RK))
+    | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((null <- comma), @someExpr), RK))
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
-    | comma, err("unexpected comma (,)") 
+    | comma, error("unexpected comma (,)") 
     ;""", replaces={ "someExpr" : someExpr })[0]) ))
     
     return descAndExprs
