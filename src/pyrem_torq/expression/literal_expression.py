@@ -1,7 +1,7 @@
 import re
 
 from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
-from ._expression import TorqExpression
+from base_expression import TorqExpression
 
 class Literal(TorqExpression):
     __slots__ = [ '__string' ]

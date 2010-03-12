@@ -418,11 +418,3 @@ def compile(src, recursionAtMarker0=True, replaces=None):
             _pte.assign_marker_expr(expr, "0", expr)
         
     return exprs
-
-if __name__ == '__main__':
-    #s = 'text match= "{";'
-    #s = 'text match= (LB <- "{") , (RB <- "}") | ?insert(hoge) huga;'
-    s = 'text match= (LBRB <- "{", "}") | ?insert(hoge);'
-    #s = 'text match= *r"^[0-9]";'
-    exprs = compile(s)
-    print "exprs=", exprs
