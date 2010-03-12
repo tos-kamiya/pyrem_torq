@@ -39,7 +39,7 @@ class TestTorqComileAndInterpret(unittest.TestCase):
     def test1st(self):
         exprStrs = [ 
             r'~((v <- +(r"^\d" | ".")) | (null <- +(" " | "\t")));',
-            r'~(v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));',
+            r'~(v <- (null <- "("), +(@0 | req^("(" | ")"), any), (null <- ")"));',
             r"""
                 ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), 
                 *(
@@ -65,8 +65,8 @@ class TestTorqComileAndInterpret(unittest.TestCase):
     def test3rd(self):
         exprStrs = [
             r'~(eol <- "\t" | "\f" | "\v" | "\r" | "\n");',
-            r'~(comment <- "/", "*", *(+"*", (xcp("/"), any) | xcp("*"), any), +"*", "/");',
-            r'~(comment <- "/", "/", *(xcp(eol), any));',
+            r'~(comment <- "/", "*", *(+"*", (req^("/"), any) | req^("*"), any), +"*", "/");',
+            r'~(comment <- "/", "/", *(req^(eol), any));',
         ]
         exprs = compile_exprs(exprStrs)
         
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     
     def test5th(self):
         atoz = 'r"^[a-z]"'
-        exprStrs = [ r'~(req(%(atoz)s), ((op_logical_and <- "and") | (op_logical_or <- "or")), xcp(%(atoz)s));' % { 'atoz': atoz } ]
+        exprStrs = [ r'~(req(%(atoz)s), ((op_logical_and <- "and") | (op_logical_or <- "or")), req^(%(atoz)s));' % { 'atoz': atoz } ]
         
         exprs = compile_exprs(exprStrs)
         

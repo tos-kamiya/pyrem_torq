@@ -55,17 +55,17 @@ def _build_parsing_exprs():
     
     # parse pattern-actions and blocks.
     stmtLevelBlock = compile("""
-    (block <- (null <- LB), *(xcp(RB), @0), (null <- RB)) 
+    (block <- (null <- LB), *(req^(RB), @0), (null <- RB)) 
     | any
     ;""")[0]
     actionLevelBlock = compile(r"""
     (pa <- 
         ((r_BEGIN | r_END) | (expr_empty <-)),
-        (block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)), 
+        (block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (null <- RB)), 
         (null <- newline))
     | (pa <- 
         (expr <- +any^(LB | newline)), 
-        ((block <- (null <- LB), *(xcp(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
+        ((block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
         (null <- newline))
     | (null <- newline)
     ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })[0]
@@ -137,7 +137,7 @@ def _build_parsing_exprs():
     
     descAndExprs.append(( "remove redundant paren", Search(compile("""
     req(expr :: expr | l_integer | l_string | l_regex | id), (<>expr :: @0)
-    | (expr :: id, LK, *(xcp(RK), @0), RK) 
+    | (expr :: id, LK, *(req^(RK), @0), RK) 
     | (expr :: ~@0) 
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
     | LB, error("unclosed '{'") | RB, error("unexpected '}'")

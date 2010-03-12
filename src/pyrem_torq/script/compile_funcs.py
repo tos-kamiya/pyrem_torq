@@ -7,10 +7,13 @@ import pyrem_torq.extra.expression_shortname as _pthes
 
 # Priority of operators
 # ()
-# + ? * <> ~ @ xcp req any^
+# + ? * <> ~ @ req req^ any^
 # ,
 # |
 # <- ::
+
+# reserved words
+# any any_node req
 
 _newLineExpr = _pte.LiteralClass(['\r', '\n', '\r\n'])
 
@@ -55,7 +58,7 @@ def parse_to_ast(s, verboseOutput=None):
             rst("insert_subtree", "<", "-"),
             rst('null', 'null'),
             rst("comma", ","), rst("semicolon", ";"),
-            rst("matches", ":", ":"), rst("anybut", "any", "^"),
+            rst("matches", ":", ":"), rst("anybut", "any", "^"), rst("reqbut", "req", "^"),
             rst("LP", "("), rst("RP", ")"), 
             rst("plus", "+"), rst("ques", "?"), rst("star", "*"), rst("or", "|"), rst("diamond", "<", ">"),
             rst("search", "~"),
@@ -83,7 +86,7 @@ def parse_to_ast(s, verboseOutput=None):
     verbosePrintTitle('parseReservedWords')
     def parseReservedWords(seq):
         def rw(name): return NM('id', L(name), newLabel=name) # reserved word
-        reservedWordExpr = rw('req') | rw('xcp') | rw('error') | rw('any') | rw('any_node') | rw('null')
+        reservedWordExpr = rw('req') | rw('error') | rw('any') | rw('any_node') | rw('null')
         return __parse(seq, reservedWordExpr | A(), "Can't parse reserved words")
     seq = parseReservedWords(seq)
     verbosePrintSeq(seq)    
@@ -93,7 +96,7 @@ def parse_to_ast(s, verboseOutput=None):
         idOrStr = N('id') | N('string_literal')
         preCheckExpr = idOrStr + idOrStr + _pte.ErrorExpr("use ',' operator for Seq expr") \
             | N('RP') + N('id') + _pte.ErrorExpr("expected ',' after paren") \
-            | N('id') + N('LP') + _pte.ErrorExpr("expected req or xcp before paren")
+            | N('id') + N('LP') + _pte.ErrorExpr("unexpected id before paren")
         preCheckExpr = preCheckExpr | A()
         return __parse(seq, preCheckExpr, "Can't parse pre-checking")
     seq = parsePreChecking(seq)
@@ -115,7 +118,7 @@ def parse_to_ast(s, verboseOutput=None):
     def parseUnaryOperators(seq):
         ed = _pte.ExprDict()
         unaryOperatorExpr = ed["unaryOperatorExpr"] = _pte.Or(recurseApplyAndParam(M("unaryOperatorExpr")),
-            BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('xcp') | N('req') | N('anybut')) + M("unaryOperatorExpr")),
+            BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('reqbut') | N('req') | N('anybut')) + M("unaryOperatorExpr")),
             BtN('error', _pte.Drop(N('error')) + N('string_literal', newLabel=_pte.FLATTEN)),
             BtN('error', _pte.Drop(N('error')) + \
                 NM('param', N('string_literal', newLabel=_pte.FLATTEN), newLabel=_pte.FLATTEN)),
@@ -286,7 +289,7 @@ def convert_to_expression_object(seq, replaces=None):
     def marker2Label(seq):
         assert seq[0] == 'marker'
         assert len(seq) >= 2
-        if len(seq) == 2 and seq[1] in ("req", "xcp", 'null', 'any', 'any_node', 'error'):
+        if len(seq) == 2 and seq[1] in ("req", "reqbut", 'null', 'any', 'any_node', 'error'):
             return None
         return "".join(seq[1:])
     def id2Label(seq):
@@ -303,7 +306,7 @@ def convert_to_expression_object(seq, replaces=None):
     nameToRep = { 'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore }
     nameToOrSeq = { 'or': _pte.Or.build, 'seq': _pte.Seq.build }
     #nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
-    nameToBuiltinFunc = { 'req': _pte.Req.build, 'xcp': _pte.Xcp.build, 'anybut': _pte.XcpThenAny.build, 'search' : _pte.Search.build }
+    nameToBuiltinFunc = { 'req': _pte.Req.build, 'reqbut': _pte.Xcp.build, 'anybut': _pte.XcpThenAny.build, 'search' : _pte.Search.build }
     
     literalExprPool = {}
     
@@ -349,7 +352,7 @@ def convert_to_expression_object(seq, replaces=None):
                 if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
                 return _pte.Node(label, newLabel=_pte.FLATTEN)
             elif seq1NodeName in nameToBuiltinFunc:
-                if len_seq != 3: raise CompileError("Invalid req/xcp/any^ expr", seq1)
+                if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
                 r = cnv_i(seq[2])
                 return nameToBuiltinFunc[seq1[0]](r)
             elif seq1NodeName in nameToRep:

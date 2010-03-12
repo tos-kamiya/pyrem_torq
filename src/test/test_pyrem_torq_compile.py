@@ -28,10 +28,10 @@ class TestTorqComile(unittest.TestCase):
         compiling('text :: (v <- +(r"^\d" | ".")) | (null <- +(" " | ">"));')
         
     def test2nd(self):
-        compiling('text :: (v <- (null <- "("), +(@0 | xcp("(" | ")"), any), (null <- ")"));')
+        compiling('text :: (v <- (null <- "("), +(@0 | req^("(" | ")"), any), (null <- ")"));')
     
     def test3rd(self):
-        compiling('text :: ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), *(xcp(v), any, ?(v <- (u_op <- "+" | "-"), (v :: ~@0)) | (v :: ~@0));')
+        compiling('text :: ?(v <- (u_op <- "+" | "-"), (v :: ~@0)), *(req^(v), any, ?(v <- (u_op <- "+" | "-"), (v :: ~@0)) | (v :: ~@0));')
         
     def test4th(self):
         compiling('text :: ~(v <- (v :: ~@0), +((b_op <- "**"), (v :: ~@0))) | (v :: ~@0);')
@@ -44,9 +44,9 @@ class TestTorqComile(unittest.TestCase):
     
     def test7th(self):
         exprStr = """
-    req(h"a"), xcp(h"a")
+    req(h"a"), req^(h"a")
     | (word <- +(h"a" | "_"))
-    | (multiline_comment <- "/", "*" *(xcp("*", "/"), any), "*", "/");
+    | (multiline_comment <- "/", "*" *(req^("*", "/"), any), "*", "/");
 """
         self.assertRaises(pyrem_torq.script.CompileError, compiling, exprStr)
     
@@ -81,11 +81,11 @@ class TestTorqComile(unittest.TestCase):
         assert len(exprs) == 1
     
     def test16th(self):
-        exprStr1 = "xcp a | b;"
+        exprStr1 = "req^ a | b;"
         exprs1 = compiling(exprStr1)
-        exprStr2 = "xcp(a | b);"
+        exprStr2 = "req^(a | b);"
         exprs2 = compiling(exprStr2)
-        exprStr3 = "(xcp a) | b;"
+        exprStr3 = "(req^ a) | b;"
         exprs3 = compiling(exprStr3)
         self.assertNotEqual(exprs1, exprs2)
         self.assertEqual(exprs1, exprs3)
