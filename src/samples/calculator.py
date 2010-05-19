@@ -1,7 +1,7 @@
 import re, collections
+import pyrem_torq
 from pyrem_torq.expression import *
 from pyrem_torq.extra.expression_shortname import BtN, L, LC, M, NM
-import pyrem_torq.treeseq as ptt
 
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
@@ -71,11 +71,11 @@ usage: calculator <expr>
     text = " ".join(sys.argv[1:])
     seq = tokenize(text)
     for expr in parsing_exprs:
-        for L in ptt.seq_pretty(seq): print L # prints an seq
+        for L in pyrem_torq.treeseq.seq_pretty(seq): print L # prints an seq
         newSeq = expr.parse(seq)
         if newSeq is None: raise SystemError
         seq = newSeq
-    for L in ptt.seq_pretty(seq): print L # prints an seq
+    for L in pyrem_torq.treeseq.seq_pretty(seq): print L # prints an seq
     result = interpret(seq)
     print result
     

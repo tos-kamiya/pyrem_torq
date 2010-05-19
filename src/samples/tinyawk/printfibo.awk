@@ -15,6 +15,5 @@ BEGIN {
     
     if (fiboTbl[9] > 50)
         print "fibo(9) > 50"
-    else
-        print "fibo(9) <= 50"
+    else { print "fibo(9) <= 50" }
 }

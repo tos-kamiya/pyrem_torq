@@ -37,17 +37,17 @@ def seq_walk(seq): # yields ( curPos, nodeName, node (or item) )
             # get out from a node
             pass
 
-#def seq_outermost_node_iter(seq, label):
-#    def soni_i(curPos, item):
-#        if _islist(item):
-#            assert len(item) >= 1
-#            if item[0] == label:
-#                yield curPos, item
-#            else:
-#                for i in xrange(1, len(item)):
-#                    for v in soni_i(curPos + [ i ], item[i]):
-#                        yield v
-#    return soni_i([], seq)
+def seq_outermost_node_iter(seq, label):
+    def soni_i(curPos, item):
+        if isinstance(item, list):
+            assert len(item) >= 1
+            if item[0] == label:
+                yield curPos, item
+            else:
+                for i in xrange(1, len(item)):
+                    for v in soni_i(curPos + [ i ], item[i]):
+                        yield v
+    return soni_i([], seq)
 
 def seq_pretty(seq):
     def find_type_range(type, seq, beginPos):

@@ -10,12 +10,10 @@
 # - assignment to NF, NR or $* is undefined behavior.
 
 import re
-import pyrem_torq
+from pyrem_torq import *
 from pyrem_torq.expression import *
-import pyrem_torq.treeseq as ptt # for debug code
-compile = pyrem_torq.script.compile
 
-def tokenize(text):
+def split_to_str(text):
     p = "|".join([
         r"/[^/\r\n]*/", r'"[^"\r\n]*"', r"\d+", # literals (regex, string, integer)
         r"#[^\r\n]*", # comment
@@ -26,11 +24,9 @@ def tokenize(text):
     ])
     return [ 'code' ] + [m.group() for m in re.finditer(p, text)]
 
-def _build_parsing_exprs():
-    descAndExprs = []
-    
+def tokenizing_expr_iter():
     # identify reserved words, literals, identifiers
-    e = Search(compile(r"""
+    e = Search(script.compile(r"""
     (r_BEGIN <- "BEGIN") | (r_END <- "END")
     | (r_next <- "next") | (r_print <- "print") | (r_if <- "if") | (r_else <- "else") | (r_while <- "while")
     | (id <- r"^[a-zA-Z_]") 
@@ -44,36 +40,38 @@ def _build_parsing_exprs():
     | (newline <- "\r\n" | "\r" | "\n")
     | (null <- r"^[ \t#]")
     | any, error("unexpected character")
-    ;""")[0])
-    descAndExprs.append(( "identify reserved words, literals, identifiers", e ))
+    ;"""))
+    yield "identify reserved words, literals, identifiers", e
     
     # identify statement-terminating new-line chars
-    e = Search(compile(r"""
+    e = Search(script.compile(r"""
     (comma | LB | op_or | op_and | r_else), (null <- newline)
-    ;""")[0])
-    descAndExprs.append(( "remove neglected new-line characters", e ))
-    
+    ;"""))
+    yield "remove neglected new-line characters", e
+
+def stmt_parsing_expr_iter():
     # parse pattern-actions and blocks.
-    stmtLevelBlock = compile("""
-    (block <- (null <- LB), *(req^(RB), @0), (null <- RB)) 
+    stmtLevelBlock = script.compile("""
+    (block <- (null <- LB), *(req^(RB), @0), (newline <-), (null <- RB))  
+        # '}' can be a terminator of a statement, so insert a dummy new-line just before '}'
     | any
-    ;""")[0]
-    actionLevelBlock = compile(r"""
+    ;""")
+    actionLevelBlock = script.compile(r"""
     (pa <- 
         ((r_BEGIN | r_END) | (expr_empty <-)),
-        (block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (null <- RB)), 
+        (block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (newline <-), (null <- RB)), 
         (null <- newline))
     | (pa <- 
         (expr <- +any^(LB | newline)), 
-        ((block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (null <- RB)) | (block_empty <-)),
+        ((block <- (null <- LB), *(req^(RB), @stmtLevelBlock), (newline <-), (null <- RB)) | (block_empty <-)),
         (null <- newline))
     | (null <- newline)
-    ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })[0]
+    ;""", replaces={ 'stmtLevelBlock' : stmtLevelBlock })
     e = [0,None] * actionLevelBlock
-    descAndExprs.append(( "parse pattern-actions and blocks", e ))
+    yield "parse pattern-actions and blocks", e
     
     # parse statements
-    getSimpleStmt = compile(r"""
+    getSimpleStmt = script.compile(r"""
     (stmt <- 
         (r_null_statement <-), semicolon 
         | (r_print_empty <- r_print), (semicolon | newline)
@@ -82,8 +80,8 @@ def _build_parsing_exprs():
         | r_next, (semicolon | newline)
         | r_next, error("invaild 'next' statement")
         | (expr <- +any^(semicolon | newline)), (semicolon | newline))
-    ;""")[0]
-    e = Search(compile(r"""
+    ;""")
+    e = Search(script.compile(r"""
     (stmt <- 
         (r_if, (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt),
         *((r_elif <- r_else, r_if), (null <- LP), (expr <- +any^(newline | RP)), (null <- RP), ?(null <- newline), ((block :: ~@0) | @getSimpleStmt)),
@@ -93,49 +91,44 @@ def _build_parsing_exprs():
     | r_while, error("invalid 'while' statement")
     | @getSimpleStmt
     | (null <- newline)
-    | semicolon, error("unexpected semicolon (;)")
     | (block :: ~@0) 
     | (pa :: (r_BEGIN | r_END | expr_empty | expr), (block :: ~@0))
     | any, error("unexpected token")
-    ;""", replaces={ 'getSimpleStmt' : getSimpleStmt })[0])
-    descAndExprs.append(( "parse statements", e ))
+    ;""", replaces={ 'getSimpleStmt' : getSimpleStmt }))
+    yield "parse statements", e
     
-    # build expression parser
-    def build_expression_parser():
+def expr_parsing_expr_iter():
+    def operator_parser_iter():
         n = Node
-        kit = pyrem_torq.extra.operator_builer.OperatorBuilder()
+        kit = extra.operator_builer.OperatorBuilder()
         kit.atomic_term_expr = Or(n("l_integer"), n("l_string"), n("l_regex"), n("id"))
         kit.composed_term_node_labels = ( "expr", )
         kit.generated_term_label = "expr"
         
-        des = []
-        
-        des.append(( "paren", kit.build_O_expr(( Drop(n("LP")), Drop(n("RP")) )) ))
+        yield "paren", kit.build_O_expr(( Drop(n("LP")), Drop(n("RP")) ))
         # Drop parentheses chars
         
-        des.append(( "index", kit.build_tO_expr(( n("LK"), n("RK") )) ))
-        des.append(( "unary ops", kit.build_Ot_expr(n("op_minus"), n("op_plus"), 
-                n("op_not"), n("op_dollar")) ))
-        des.append(( "binary mul/div", kit.build_tOt_expr(n("op_mul"), n("op_div"), n("op_mod")) ))
-        des.append(( "binary add/sub", kit.build_tOt_expr(n("op_minus"), n("op_plus")) ))
+        yield "index", kit.build_tO_expr(( n("LK"), n("RK") ))
+        yield "unary ops", kit.build_Ot_expr(n("op_minus"), n("op_plus"), n("op_not"), n("op_dollar"))
+        yield "binary mul/div", kit.build_tOt_expr(n("op_mul"), n("op_div"), n("op_mod"))
+        yield "binary add/sub", kit.build_tOt_expr(n("op_minus"), n("op_plus"))
         
-        des.append(( "binary string concatenate", kit.build_tOt_expr(InsertNode("op_cat")) ))
+        yield "binary string concatenate", kit.build_tOt_expr(InsertNode("op_cat"))
         # The concatenation operator is epsilon, so that insert a token 'op_cat' where the operator appears
         
-        des.append(( "binary compare ops", kit.build_tOt_expr(\
-                n("op_gt"), n("op_ge"), n("op_lt"), n("op_le"), n("op_ne"), n("op_eq")) ))
-        des.append(( "binary logical-and", kit.build_tOt_expr(n("op_and")) ))
-        des.append(( "binary logical-or", kit.build_tOt_expr(n("op_or")) ))
-        des.append(( "comma", kit.build_tOt_expr(n("comma")) ))
-        des.append(( "binary assign op", kit.build_tOt_expr(n("op_assign")) ))
-        return des
-    for desc, eParser in build_expression_parser():
-        e = Search(compile("""(expr :: @eParser)
+        yield "binary compare ops", kit.build_tOt_expr(\
+                n("op_gt"), n("op_ge"), n("op_lt"), n("op_le"), n("op_ne"), n("op_eq"))
+        yield "binary logical-and", kit.build_tOt_expr(n("op_and"))
+        yield  "binary logical-or", kit.build_tOt_expr(n("op_or"))
+        yield  "comma", kit.build_tOt_expr(n("comma"))
+        yield  "binary assign op", kit.build_tOt_expr(n("op_assign"))
+    for desc, eParser in operator_parser_iter():
+        e = Search(script.compile("""(expr :: @eParser)
         | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
-        ;""", replaces={ "eParser" : eParser })[0])
-        descAndExprs.append(( "expression " + desc, e ))
+        ;""", replaces={ "eParser" : eParser }))
+        yield "expression " + desc, e
     
-    descAndExprs.append(( "remove redundant paren", Search(compile("""
+    yield "remove redundant paren", Search(script.compile("""
     req(expr :: expr | l_integer | l_string | l_regex | id), (<>expr :: @0)
     | (expr :: id, LK, *(req^(RK), @0), RK) 
     | (expr :: ~@0) 
@@ -144,62 +137,21 @@ def _build_parsing_exprs():
     | LP, error("unclosed '('") | RP, error("unexpected ')'")
     | id, LK, error("unclosed '['") | LK, error("unexpected '['") | RK, error("unexpected ']'")
     | any
-    ;""")[0]) ))
+    ;"""))
     
-    someExpr = compile("(l_integer | l_string | l_regex | id | (expr :: ~@0));")[0]
-    descAndExprs.append(( "reform comma expressions", Search(compile("""
+    someExpr = script.compile("(l_integer | l_string | l_regex | id | (expr :: ~@0));")
+    yield "reform comma expressions", Search(script.compile("""
     (r_print, (<>expr :: @someExpr, +(comma, @someExpr)))
     | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((null <- comma), @someExpr), RK))
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
     | comma, error("unexpected comma (,)") 
-    ;""", replaces={ "someExpr" : someExpr })[0]) ))
-    
-    return descAndExprs
+    ;""", replaces={ "someExpr" : someExpr }))
 
-parsing_exprs = _build_parsing_exprs()
-
-class Interpreter(object):
-    class NextStmt(Exception): pass
-
-    def __init__(self, ast):
-        self.patternActions = [( paNode[1], paNode[2] ) for paNode in ast[1:]]
+class ExprInterpreter(object):
+    def __init__(self):
         self.nr, self.line, self.curFields = None, None, None
         self.varTable = {}
     
-    def do_begin(self): 
-        self.nr, self.line, self.curFields = 0, None, []
-        self.varTable.update([ ( "NR", self.nr ), ( "NF", 0 ) ])
-        try:
-            self._exec()
-        except Interpreter.NextStmt:
-            raise SystemError("next statement in BEGIN action")
-            
-    def do_end(self):
-        self.nr, self.line, self.curFields = -1, None, []
-        self.varTable.update([ ( "NF", 0 ) ])
-        self._exec()
-    
-    def do_line(self, nr, line):
-        assert nr >= 1
-        fields = line.split()
-        self.nr, self.line, self.curFields = nr, line, [ line ] + fields
-        self.varTable.update([ ( "NR", self.nr ), ( "NF", len(fields) ) ])
-        self._exec()
-
-    def _exec(self):
-        for exprNode, blockNode in self.patternActions:
-            e0 = exprNode[0]
-            if e0 == "r_BEGIN":
-                if self.nr == 0: self.exec_stmt(blockNode)
-            elif e0 == "r_END":
-                if self.nr == -1: self.exec_stmt(blockNode)
-            else:
-                try:
-                    if self.nr >= 1 and (e0 == "expr_empty" or self.eval_expr(exprNode)): 
-                        self.exec_stmt(blockNode)
-                except Interpreter.NextStmt:
-                    break # for 
-     
     def eval_expr(self, exprNode):
         def cast_to_int(s): return 0 if not s else int(s) # an empty string is converted to 0
 
@@ -302,6 +254,41 @@ class Interpreter(object):
             return assingedValue
         
         assert False # unknown operator/invalid expression
+
+class StmtInterpreter(ExprInterpreter):
+    class NextStmt(Exception): pass
+
+    def __init__(self, ast):
+        ExprInterpreter.__init__(self)
+        self.beginActions = []; self.endActions = []; self.patternActions = []
+        d = { "r_BEGIN" : self.beginActions, "r_END" : self.endActions }
+        for paNode in ast[1:]:
+            exprNode, blockNode = paNode[1], paNode[2]
+            d.get(exprNode[0], self.patternActions).append(( exprNode, blockNode ))
+    
+    def expects_input(self): return len(self.patternActions + self.endActions) > 0
+    
+    def apply_begin(self):
+        self.nr, self.line, self.curFields = 0, None, []
+        self.varTable.update([ ( "NR", self.nr ), ( "NF", 0 ) ])
+        for _, blockNode in self.beginActions: self.exec_stmt(blockNode)
+            
+    def apply_end(self):
+        self.nr, self.line, self.curFields = -1, None, []
+        self.varTable.update([ ( "NF", 0 ) ])
+        for _, blockNode in self.endActions: self.exec_stmt(blockNode)
+    
+    def apply_line(self, nr, line):
+        assert nr >= 1
+        fields = line.split()
+        self.nr, self.line, self.curFields = nr, line, [ line ] + fields
+        self.varTable.update([ ( "NR", self.nr ), ( "NF", len(fields) ) ])
+        try:
+            for exprNode, blockNode in self.patternActions:
+                if exprNode[0] == "expr_empty" or self.eval_expr(exprNode): 
+                    self.exec_stmt(blockNode)
+        except StmtInterpreter.NextStmt: 
+            pass
             
     def exec_stmt(self, stmtNode):
         if stmtNode[-1][0] in ("newline", "semicolon"):
@@ -335,7 +322,7 @@ class Interpreter(object):
         elif cmdLbl == "r_print_empty":
             print self.line
         elif cmdLbl == "r_next":
-            raise Interpreter.NextStmt
+            raise StmtInterpreter.NextStmt
         elif cmdLbl == "r_null_statement":
             pass
         else:
@@ -362,29 +349,34 @@ def main(debugTrace=False):
     script = script + "\n" # prepare for missing new-line char at the last line
     
     # parsing
-    seq = tokenize(script)
-    for desc, expr in parsing_exprs:
+    seq = split_to_str(script)
+    des = []
+    des.extend(tokenizing_expr_iter())
+    des.extend(stmt_parsing_expr_iter()) 
+    des.extend(expr_parsing_expr_iter())
+    for desc, expr in des:
         if debugWrite:
-            debugWrite("\n".join(ptt.seq_pretty(seq)) + "\n") # prints a seq
+            debugWrite("\n".join(treeseq.seq_pretty(seq)) + "\n") # prints a seq
             debugWrite("step: %s\n" % desc)
         try:
             newSeq = expr.parse(seq)
         except InterpretError, e: print repr(e); raise e
         if newSeq is None: raise SystemError("parse error")
         seq = newSeq
-    if debugWrite: debugWrite("\n".join(ptt.seq_pretty(seq)) + "\n") # prints a seq
+    if debugWrite: debugWrite("\n".join(treeseq.seq_pretty(seq)) + "\n") # prints a seq
 
     # interpretation
-    interp = Interpreter(seq)
+    interp = StmtInterpreter(seq)
     def dbgwrite(): 
         if debugWrite: debugWrite("variables=%s\n" % repr(interp.varTable))
 
-    interp.do_begin(); dbgwrite()
-    f = open(inputFile, "r") if inputFile else sys.stdin
-    for lnum, L in enumerate(f):
-        interp.do_line(lnum+1, L.rstrip()); dbgwrite()
-    if inputFile: f.close()
-    interp.do_end(); dbgwrite()
+    interp.apply_begin(); dbgwrite()
+    if interp.expects_input():
+        f = open(inputFile, "r") if inputFile else sys.stdin
+        for lnum, L in enumerate(f):
+            interp.apply_line(lnum+1, L.rstrip()); dbgwrite()
+        if inputFile: f.close()
+        interp.apply_end(); dbgwrite()
 
 if __name__ == '__main__':
     main(debugTrace=True)

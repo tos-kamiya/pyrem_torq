@@ -94,6 +94,12 @@ class TestTorqComile(unittest.TestCase):
         expr1 = compiling('"a", error("should not a");')
         expr2 = compiling('"a", error "should not a";')
         self.assertEqual(expr1, expr2)
+        
+    def test18th(self):
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, "a b;")
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, "a (b);")
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) (b);")
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) b;")
     
 if __name__ == '__main__':
     unittest.main()
