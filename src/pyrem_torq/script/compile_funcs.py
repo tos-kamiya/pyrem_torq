@@ -6,7 +6,6 @@ import string
 import pyrem_torq.expression as _pte
 from pyrem_torq.treeseq import seq_pretty
 from pyrem_torq.utility import split_to_strings_iter
-import pyrem_torq.extra.expression_shortname as _pthes
 
 # Priority of operators
 # ()
@@ -28,9 +27,19 @@ class CompileError(StandardError):
         StandardError.__init__(self, message)
         self.referenceNode = referenceNode
 
-def parse_to_ast(input, verboseOutput=None):
-    A, AN, BtN, IN, L, LC, M, N, NM, R, XtA = _pthes.A, _pthes.AN, _pthes.BtN, _pthes.IN, _pthes.L, _pthes.LC, _pthes.M, _pthes.N, _pthes.NM, _pthes.R, _pthes.XtA
-    
+def parse_to_ast(inputSeq, verboseOutput=None):
+    A = _pte.Any.build
+    AN = _pte.AnyNode.build
+    BtN = _pte.BuildToNode.build
+    IN = _pte.InsertNode
+    L = _pte.Literal.build
+    LC = _pte.LiteralClass.build
+    M = _pte.Marker.build
+    N = _pte.Node.build
+    NM = _pte.NodeMatch.build
+    R = _pte.Rex.build
+    XtA = _pte.AnyBut.build
+     
     seq = []
     if verboseOutput:
         @contextmanager
@@ -45,7 +54,7 @@ def parse_to_ast(input, verboseOutput=None):
             yield
     
     with verbose_print_step_title_and_result_seq('input'):
-        s = [ 'code' ]; s.extend(split_to_strings_iter(input))
+        s = [ 'code' ]; s.extend(split_to_strings_iter(inputSeq))
         seq[:] = s
     
     with verbose_print_step_title_and_result_seq('ParseToken'):
@@ -177,11 +186,11 @@ def parse_to_ast(input, verboseOutput=None):
             return __fill(paramExpr, "Can't parse redundant paren")
         seq[:] = parseReduceRedundantParenExpr().parse(seq)
     
-    with verbose_print_step_title_and_result_seq('parseStatements'):
-        def parseStatementsExpr():
-            statementExpr = BtN('statement', XtA(N('semicolon')) + N('semicolon'))
-            return __fill(statementExpr, "Can't parse statement")
-        seq[:] = parseStatementsExpr().parse(seq)
+    with verbose_print_step_title_and_result_seq('parseStatement'):
+        def parseStatementExpr():
+            statementExpr = BtN('statement', N('semicolon') | XtA(N('semicolon')) + N('semicolon'))
+            return statementExpr + (_pte.EndOfNode() | _pte.ErrorExpr("Can't parse statement"))
+        seq[:] = parseStatementExpr().parse(seq)
     
     #print "\n".join(seq_pretty(seq))
     return seq
@@ -270,161 +279,179 @@ def convert_literal_to_expression_object(s):
     else:
         return _pte.Literal(__unescape(s))
 
-def convert_to_expression_object(seq, replaces=None):
-    if replaces:
-        if isinstance(replaces, ( list, tuple )):
-            assert len(replaces) == 2
-            assert isinstance(replaces[1], _pte.TorqExpression)
-            replaceTable = { replaces[0]:replaces[1] }
-        else:
-            for label, expr in replaces.iteritems():
-                assert isinstance(expr, _pte.TorqExpression)
-            replaceTable = replaces
-    else:
-        replaceTable = {}
+def _nodeNameIn(seq, names): 
+    return len(seq) >= 1 and seq[0] in names
     
-    def nodeNameIn(seq, names): 
-        return len(seq) >= 1 and seq[0] in names
-    alpha_Set = frozenset(list(string.ascii_letters) + [ '_' ])
-    alnum_Set = frozenset(list(string.ascii_letters) + [ '_' ] + list(string.digits))
-    def marker2Label(seq):
+def cnv_i(seq, replaceTable, literalExprPool):
+    def _marker2Label(seq):
         assert seq[0] == 'marker'
         assert len(seq) >= 2
         if len(seq) == 2 and seq[1] in ("req", "reqbut", 'null', 'any', 'any_node', 'error'):
             return None
         return "".join(seq[1:])
-    def id2Label(seq):
+        
+    _alpha_Set = frozenset(list(string.ascii_letters) + [ '_' ])
+    _alnum_Set = frozenset(list(string.ascii_letters) + [ '_' ] + list(string.digits))
+    
+    def _id2Label(seq):
         if not(len(seq) >= 2): return None
         if seq[0] != 'id': return None
         s = seq[1:]
-        if s[0][0] not in alpha_Set: return None
+        if s[0][0] not in _alpha_Set: return None
         for ss in s[1:]:
-            if ss[0] not in alnum_Set: return None
+            if ss[0] not in _alnum_Set: return None
         return "".join(s)
     
+    _nameToRep = { 'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore }
+    _nameToOrSeq = { 'or': _pte.Or.build, 'seq': _pte.Seq.build }
+    #_nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
+    _nameToBuiltinFunc = { 'req': _pte.Require.build, 'reqbut': _pte.RequireBut.build, 'anybut': _pte.AnyBut.build, 'search' : _pte.Search.build }
+    
+    len_seq = len(seq)
+    
+    assert len_seq >= 1
+    if len_seq == 1: raise CompileError("Invalid Code", seq)
+    seq0, seq1 = seq[0], seq[1]
+    if seq0 == 'apply':
+        seq1NodeName = seq1[0] if len(seq1) >= 1 else None
+        if seq1NodeName == 'matches':
+            is_flatten = False
+            if _nodeNameIn(seq[2], ( 'expand', )):
+                is_flatten = True
+                del seq[2]; len_seq = len(seq)
+            if len_seq != 4: raise CompileError("Invalid NodeMatch(::) expr", seq1)
+            label = _id2Label(seq[2])
+            if not label: raise CompileError("Operator NodeMatch(::) requires an identifier", seq[2])
+            return _pte.NodeMatch(label, cnv_i(seq[3], replaceTable, literalExprPool), newLabel=(_pte.FLATTEN if is_flatten else None))
+        elif seq1NodeName == 'insert_subtree':
+            if len_seq == 3:
+                if seq[2][0] == 'null': raise CompileError("Invalid form. '(null <- )' is not permitted")
+                label = _id2Label(seq[2])
+                if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
+                return _pte.InsertNode(label)
+            else:
+                if len_seq != 4: raise CompileError("Invalid InsertNode(<-)", seq1)
+                if seq[2][0] == 'null':
+                    return _pte.Drop(cnv_i(seq[3], replaceTable, literalExprPool))
+                else:
+                    label = _id2Label(seq[2])
+                    if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
+                    return _pte.BuildToNode(label, cnv_i(seq[3], replaceTable, literalExprPool))
+        elif seq1NodeName == 'insert':
+            if len_seq != 3: raise CompileError("Invalid insert expr", seq1)
+            label = _id2Label(seq[2])
+            if not label: raise CompileError("insert requires an identifier", seq[2])
+            return _pte.InsertNode(label)
+        elif seq1NodeName == 'expand':
+            if len_seq != 3: raise CompileError("Invalid flatten(<>) expr", seq1)
+            label = _id2Label(seq[2])
+            if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
+            return _pte.Node(label, newLabel=_pte.FLATTEN)
+        elif seq1NodeName in _nameToBuiltinFunc:
+            if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
+            r = cnv_i(seq[2], replaceTable, literalExprPool)
+            return _nameToBuiltinFunc[seq1[0]](r)
+        elif seq1NodeName in _nameToRep:
+            if len_seq != 3: raise CompileError("Invalid Repeat expr", seq1)
+            r = cnv_i(seq[2], replaceTable, literalExprPool)
+            return _nameToRep[seq1[0]](r)
+        elif seq1NodeName in _nameToOrSeq:
+            if not(len_seq >= 2): raise CompileError("Invalid Or(|)/Seq(,) expr", seq1)
+            r = [ cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
+            return _nameToOrSeq[seq1[0]](*r)
+        else:
+            assert False
+    elif seq0 == "any":
+        assert len_seq == 2
+        return _pte.Any()
+    elif seq0 == "any_node":
+        assert len_seq == 2
+        return _pte.AnyNode()
+    elif seq0 == 'id':
+        label = _id2Label(seq)
+        if not label: raise CompileError("Invalid Label", seq0)
+        return _pte.Node(label)
+    elif seq0 == 'marker':
+        label = _marker2Label(seq)
+        if not label: raise CompileError("Invalid Marker", seq0)
+        r = replaceTable.get(label)
+        if r is not None:
+            return r
+        return _pte.Marker(label)
+    elif seq0 == 'error':
+        if not(len_seq >= 2): raise CompileError("Empty error message", seq0)
+        s = "".join(seq[1:])
+        return _pte.ErrorExpr(__unescape(s))
+    elif seq0 == 'string_literal':
+        if not(len_seq >= 2): raise CompileError("Empty Literal", seq0)
+        s = "".join(seq[1:])
+        pooledExpr = literalExprPool.get(s)
+        if not pooledExpr:
+            try:
+                pooledExpr = convert_literal_to_expression_object(s)
+                literalExprPool[s] = pooledExpr
+            except AssertionError:
+                raise CompileError("Invalid literal", seq0)
+        return pooledExpr
+    else:
+        raise CompileError("Invalid Token", seq)
+        
+def _to_dict(replaces):
+    if not replaces: 
+        return {}
+    try:
+        return dict(replaces.iteritems())
+    except:
+        assert len(replaces) == 2
+        assert isinstance(replaces[1], _pte.TorqExpression)
+        return { replaces[0]:replaces[1] }
+
+def convert_to_expression_object(seq, replaces=None):
+    replaceTable = _to_dict(replaces)
+    if '0' in replaceTable:
+        raise ValueError("replaces must not include an item with key '0'")
+    for label, expr in replaceTable.iteritems():
+        assert isinstance(expr, _pte.TorqExpression)
+    expr0 = _pte.Marker('0') # prepare expr0 for an entry point of recursion
+    replaceTable['0'] = expr0
+        
     assert len(seq) >= 1 and seq[0] == 'code'
     
-    nameToRep = { 'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore }
-    nameToOrSeq = { 'or': _pte.Or.build, 'seq': _pte.Seq.build }
-    #nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
-    nameToBuiltinFunc = { 'req': _pte.Req.build, 'reqbut': _pte.Xcp.build, 'anybut': _pte.XcpThenAny.build, 'search' : _pte.Search.build }
+    if len(seq) == 1:
+        return None
     
-    literalExprPool = {}
+    assert len(seq) == 2
+    statementSeq = seq[1]
+    len_statementSeq = len(statementSeq)
     
-    def cnv_i(seq):
-        len_seq = len(seq)
-        
-        assert len_seq >= 1
-        if len_seq == 1: raise CompileError("Invalid Code", seq)
-        seq0, seq1 = seq[0], seq[1]
-        if seq0 == 'apply':
-            seq1NodeName = seq1[0] if len(seq1) >= 1 else None
-            if seq1NodeName == 'matches':
-                is_flatten = False
-                if nodeNameIn(seq[2], ( 'expand', )):
-                    is_flatten = True
-                    del seq[2]; len_seq = len(seq)
-                if len_seq != 4: raise CompileError("Invalid NodeMatch(::) expr", seq1)
-                label = id2Label(seq[2])
-                if not label: raise CompileError("Operator NodeMatch(::) requires an identifier", seq[2])
-                return _pte.NodeMatch(label, cnv_i(seq[3]), newLabel=(_pte.FLATTEN if is_flatten else None))
-            elif seq1NodeName == 'insert_subtree':
-                if len_seq == 3:
-                    if seq[2][0] == 'null': raise CompileError("Invalid form. '(null <- )' is not permitted")
-                    label = id2Label(seq[2])
-                    if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
-                    return _pte.InsertNode(label)
-                else:
-                    if len_seq != 4: raise CompileError("Invalid InsertNode(<-)", seq1)
-                    if seq[2][0] == 'null':
-                        return _pte.Drop(cnv_i(seq[3]))
-                    else:
-                        label = id2Label(seq[2])
-                        if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
-                        return _pte.BuildToNode(label, cnv_i(seq[3]))
-            elif seq1NodeName == 'insert':
-                if len_seq != 3: raise CompileError("Invalid insert expr", seq1)
-                label = id2Label(seq[2])
-                if not label: raise CompileError("insert requires an identifier", seq[2])
-                return _pte.InsertNode(label)
-            elif seq1NodeName == 'expand':
-                if len_seq != 3: raise CompileError("Invalid flatten(<>) expr", seq1)
-                label = id2Label(seq[2])
-                if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
-                return _pte.Node(label, newLabel=_pte.FLATTEN)
-            elif seq1NodeName in nameToBuiltinFunc:
-                if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
-                r = cnv_i(seq[2])
-                return nameToBuiltinFunc[seq1[0]](r)
-            elif seq1NodeName in nameToRep:
-                if len_seq != 3: raise CompileError("Invalid Repeat expr", seq1)
-                r = cnv_i(seq[2])
-                return nameToRep[seq1[0]](r)
-            elif seq1NodeName in nameToOrSeq:
-                if not(len_seq >= 2): raise CompileError("Invalid Or(|)/Seq(,) expr", seq1)
-                r = [ cnv_i(item) for item in seq[2:] ]
-                return nameToOrSeq[seq1[0]](*r)
-            else:
-                assert False
-        elif seq0 == "any":
-            assert len_seq == 2
-            return _pte.Any()
-        elif seq0 == "any_node":
-            assert len_seq == 2
-            return _pte.AnyNode()
-        elif seq0 == 'id':
-            label = id2Label(seq)
-            if not label: raise CompileError("Invalid Label", seq0)
-            return _pte.Node(label)
-        elif seq0 == 'marker':
-            label = marker2Label(seq)
-            if not label: raise CompileError("Invalid Marker", seq0)
-            r = replaceTable.get(label)
-            if r is not None:
-                return r
-            return _pte.Marker(label)
-        elif seq0 == 'error':
-            if not(len_seq >= 2): raise CompileError("Empty error message", seq0)
-            s = "".join(seq[1:])
-            return _pte.ErrorExpr(__unescape(s))
-        elif seq0 == 'string_literal':
-            if not(len_seq >= 2): raise CompileError("Empty Literal", seq0)
-            s = "".join(seq[1:])
-            pooledExpr = literalExprPool.get(s)
-            if not pooledExpr:
-                try:
-                    pooledExpr = convert_literal_to_expression_object(s)
-                    literalExprPool[s] = pooledExpr
-                except AssertionError:
-                    raise CompileError("Invalid literal", seq0)
-            return pooledExpr
-        else:
-            raise CompileError("Invalid Token", seq)
-        
-    r = []
-    for statementSeq in seq[1:]:
-        assert len(statementSeq) >= 1
-        if statementSeq[0] != 'statement':
-            raise CompileError("Expected Statement", statementSeq)
-        if not(len(statementSeq) == 3 and nodeNameIn(statementSeq[2], ( 'semicolon' ))):
+    assert len_statementSeq in ( 2, 3 )
+    if statementSeq[0] != 'statement':
+        raise CompileError("Expected Statement", statementSeq)
+    if len_statementSeq == 2:
+        assert _nodeNameIn(statementSeq[1], ( 'semicolon' ))
+        return None
+    elif len_statementSeq == 3:
+        if not _nodeNameIn(statementSeq[2], ( 'semicolon' )):
             raise CompileError("Invalid Statement", statementSeq)
-        r.append(cnv_i(statementSeq[1]))
-    
-    return r
+        literalExprPool = {}
+        expr = cnv_i(statementSeq[1], replaceTable, literalExprPool)
+        
+        expr0.expr = expr # set up the recursion
+        return expr
+    else:
+        assert False
 
-def compile(src, recursionAtMarker0=True, replaces=None, topLevelSplit=False):
+def compile(src, replaces=None):
+    ''' Compile a string src as a troq source code and return a expression as a result of the compilation.
+        If src is empty as a source code (such as "", "\n", or ";"), this function returns None.
+    '''
+    replaces = _to_dict(replaces)
+    if '0' in replaces:
+        raise ValueError("replaces must not include an item with key '0'")
+    
     try:
         seq = parse_to_ast(src)
     except _pte.InterpretError, e:
         raise CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     
-    exprs = convert_to_expression_object(seq, replaces=replaces)
-    
-    if recursionAtMarker0:
-        for expr in exprs:
-            _pte.assign_marker_expr(expr, "0", expr)
-    
-    if topLevelSplit:
-        return exprs
-    
-    return _pte.Or(*exprs)
+    return convert_to_expression_object(seq, replaces=replaces)

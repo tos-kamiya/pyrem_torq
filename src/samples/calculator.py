@@ -1,7 +1,12 @@
 import re, collections
 import pyrem_torq
 from pyrem_torq.expression import *
-from pyrem_torq.extra.expression_shortname import BtN, L, LC, M, NM
+
+BtN = BuildToNode.build
+L = Literal.build
+LC = LiteralClass.build
+M = Marker.build
+NM = NodeMatch.build
 
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
@@ -13,7 +18,7 @@ def _build_parsing_exprs():
     r = []
     
     # atomic
-    parenV = BtN('v', Drop(L('(')) + [0,None]*(Xcp(L(')')) + M('0')) + Drop(L(')')))
+    parenV = BtN('v', Drop(L('(')) + [0,None]*(RequireBut(L(')')) + M('0')) + Drop(L(')')))
     numberV = BtN('v', Rex(r"^(\d|[.])"))
     r.append(Search(to_recursive(parenV | numberV | Any())))
 

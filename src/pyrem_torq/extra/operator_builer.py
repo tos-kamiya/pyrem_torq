@@ -52,9 +52,10 @@ class OperatorBuilder(object):
             
         termExpr = self._make_term_expr()
         
+        expr0 = Marker('0')
         ovExprs = []
         for opOpen, opClose in castLikeExprs:
-            e = opOpen + [0,None] * (Xcp(opClose) + (Marker('0') | Any())) + opClose
+            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             ovExprs.append(e)
         ovExprs.extend(signLikeExprs)
         
@@ -62,10 +63,8 @@ class OperatorBuilder(object):
         expr = BuildToNode(self.__gtl, [1,None] * Or.build(*ovExprs) + termExpr) + whereShouldNotBeRegardedAsOperator
         # this "+ [0,1] * Or.build(*opBeinExprs)" is used to neglect the operator appears after some term.
         
-        expr = expr | (termExpr + whereShouldNotBeRegardedAsOperator)
-        
-        assign_marker_expr(expr, '0', expr) 
-        return Search(expr)
+        expr0.expr = expr | (termExpr + whereShouldNotBeRegardedAsOperator)
+        return Search(expr0)
     
     def build_tO_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
@@ -83,20 +82,20 @@ class OperatorBuilder(object):
         
         terms = [ self.__ate ]
         terms.extend(Node(lbl) for lbl in self.__ctnls)
-        whereTermShouldNotAppear = Xcp(Or.build(*terms))
+        whereTermShouldNotAppear = RequireBut(Or.build(*terms))
         
+        expr0 = Marker('0')
         voExprs = []
         for opOpen, opClose in callLikeExprs:
-            e = opOpen + [0,None] * (Xcp(opClose) + (Marker('0') | Any())) + opClose + whereTermShouldNotAppear
+            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose + whereTermShouldNotAppear
             voExprs.append(e)
         for op in repeatLikeExprs:
             e = op + whereTermShouldNotAppear
             voExprs.append(e)
         
         expr = BuildToNode(self.__gtl, termExpr + [1,None] * Or.build(*voExprs))
-        expr = expr | termExpr
-        assign_marker_expr(expr, '0', expr) 
-        return Search(expr)
+        expr0.expr = expr | termExpr
+        return Search(expr0)
     
     def build_tOt_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
@@ -113,31 +112,31 @@ class OperatorBuilder(object):
         
         termExpr = self._make_term_expr()
         
+        expr0 = Marker('0')
         vowExprs = []
         for opOpen, opClose in conditionLikeExprs:
-            e = opOpen + [0,None] * (Xcp(opClose) + (Marker('0') | Any())) + opClose
+            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             vowExprs.append(e)
         vowExprs.extend(addLikeExprs)
         
         expr = BuildToNode(self.__gtl, termExpr + [1,None] * (Or.build(*vowExprs) + termExpr))
-        expr = expr | termExpr
-        assign_marker_expr(expr, '0', expr) 
-        return Search(expr)
+        expr0.expr = expr | termExpr
+        return Search(expr0)
     
     def build_O_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
         
         termExpr = self._make_term_expr()
         
+        expr0 = Marker('0')
         ovpExprs = []
         for opOpen, opClose in ops:
-            e = BuildToNode(self.__gtl, opOpen + [0,None] * (Xcp(opClose) + (Marker('0') | Any())) + opClose)
+            e = BuildToNode(self.__gtl, opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose)
             ovpExprs.append(e)
         ovpExprs.append(termExpr)
         expr = Or.build(*ovpExprs)
-        expr = expr | termExpr
-        assign_marker_expr(expr, '0', expr) 
-        return Search(expr)
+        expr0.expr = expr | termExpr
+        return Search(expr0)
 
 if __name__ == '__main__':
     import re

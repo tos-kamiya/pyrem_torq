@@ -9,29 +9,27 @@ import unittest
 
 to_gsublike_expr = pyrem_torq.expression.Search.build
 
-def my_compile(exprStr, recursionAtMarker0=True):
-    try:
-        seq = pyrem_torq.script.parse_to_ast(exprStr, sys.stderr)
-    except pyrem_torq.expression.InterpretError, e:
-        raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
-    #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
-    
-    exprs = pyrem_torq.script.convert_to_expression_object(seq)
-    
-    if recursionAtMarker0:
-        for expr in exprs:
-            expr.replace_marker_expr("0", expr)
-    
-    return exprs
+#def my_compile(exprStr, recursionAtMarker0=True):
+#    try:
+#        seq = pyrem_torq.script.parse_to_ast(exprStr, sys.stderr)
+#    except pyrem_torq.expression.InterpretError, e:
+#        raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
+#    #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
+#    
+#    exprs = pyrem_torq.script.convert_to_expression_object(seq)
+#    
+#    if recursionAtMarker0:
+#        for expr in exprs:
+#            expr.replace_marker_expr("0", expr)
+#    
+#    return exprs
 
 def compile_exprs(exprStrs):
     exprs = []
     for exprStr in exprStrs:
-        expr = pyrem_torq.script.compile(exprStr, recursionAtMarker0=True)
-        #expr = my_compile(exprStr, recursiionAtMarker0=True)
+        expr = pyrem_torq.script.compile(exprStr)
+        #expr = my_compile(exprStr)
         
-        assert len(expr) == 1
-        expr = expr[0]
         exprs.append(expr)
     return exprs
 
@@ -51,7 +49,7 @@ class TestTorqComileAndInterpret(unittest.TestCase):
             r'~((v <- (v :: ~@0), +((b_op <- "**"), (v :: ~@0))) | (v :: ~@0));',
             r'~((v <- (v :: ~@0), +((b_op <- "*" | "/"), (v :: ~@0))) | (v :: ~@0));', 
             r'~((v <- (v :: ~@0), +((b_op <- "+" | "-"), (v :: ~@0))) | (v :: ~@0));',
-        ]
+                ]
         exprs = compile_exprs(exprStrs)
         
         seq = [ 'code' ]; seq.extend(split_to_strings_iter("+1.0 + 2 * ((3 - 4) / -.5) ** 6"))
@@ -97,7 +95,7 @@ int main(int argc, char *argv[])
         BtN = pyrem_torq.expression.BuildToNode.build
         L = pyrem_torq.expression.Literal.build
         A = pyrem_torq.expression.Any.build
-        Q = pyrem_torq.expression.Req.build
+        Q = pyrem_torq.expression.Require.build
         S = pyrem_torq.expression.Search.build
         
         eolExpr = BtN('eol', L("\r\n") | L("\n") | L("\r"))
@@ -203,6 +201,6 @@ int main(int argc, char *argv[])
         inputText = r'a,b,c'
         seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
         self.assertRaises(pyrem_torq.expression.InterpretErrorByErrorExpr, exprs[0].parse, seq)
-        
+    
 if __name__ == '__main__':
     unittest.main()

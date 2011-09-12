@@ -4,6 +4,9 @@ from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 from base_expression import TorqExpression
 
 class Literal(TorqExpression):
+    ''' Literal expression matches a sequence of characters, which is the same to the internal string. 
+    '''
+    
     __slots__ = [ '__string' ]
     
     def __init__(self, s):
@@ -35,6 +38,9 @@ class Literal(TorqExpression):
         return None
 
 class AnyLiteral(TorqExpression): # singleton
+    ''' AnyLiteral expression matches a length-1 sequence of character. 
+    '''
+    
     __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
@@ -54,6 +60,9 @@ class AnyLiteral(TorqExpression): # singleton
         return None
 
 class LiteralClass(TorqExpression):
+    ''' LiteralClass expression matches the sequence of characters that is the same to one of the internal strings.
+    '''
+    
     __slots__ = [ '__strings', '__stringSet' ]
     
     def __init__(self, strings):
@@ -98,6 +107,9 @@ class RexCompilationUnable(ValueError):
     pass
 
 class Rex(TorqExpression):
+    ''' Rex expression matches a sequence of characters with the internal regular expression.
+    '''
+    
     __slots__ = [ '__expression_match', '__expressionstr', '__ignoreCase' ]
     
     def __init__(self, exprStr, ignoreCase=False):
@@ -105,7 +117,7 @@ class Rex(TorqExpression):
             flags = re.DOTALL
             if ignoreCase: flags |= re.IGNORECASE
             pat = re.compile(exprStr, flags)
-        except Exception, e:
+        except Exception:
             raise RexCompilationUnable("invalid regex string: %s" % repr(exprStr))
         self.__expression_match = pat.match
         self.__expressionstr = exprStr

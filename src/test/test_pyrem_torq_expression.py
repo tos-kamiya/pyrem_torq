@@ -250,11 +250,11 @@ class TestTorqExpression(unittest.TestCase):
             nodes, literals, epsilon = r
             return list(nodes), list(literals), epsilon
         
-        expr = Req(Node("a"))
+        expr = Require(Node("a"))
         self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
                 ( [ 'a' ], [], False ))
         
-        expr = Req(Literal("a"))
+        expr = Require(Literal("a"))
         self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
                 ( [], [ 'a' ], False ))
         
@@ -291,11 +291,11 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ ])
     
     def testRemoveRedundantParen(self):
-        expr = Or(Req(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", Marker('0'), newLabel=FLATTEN),
+        expr0 = Marker('0')
+        expr0.expr = Or(Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
             NodeMatch("expr", Search(Marker('0'))),
             Any())
-        assign_marker_expr(expr, '0', expr)
-        expr = Search(expr)
+        expr = Search(expr0)
         
         seq = [ 'code', [ 'expr', [ 'literal', 'a' ] ] ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)

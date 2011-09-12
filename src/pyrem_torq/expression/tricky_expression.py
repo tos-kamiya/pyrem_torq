@@ -6,7 +6,11 @@ from node_expression import Node, NodeClass
 
 _zeroLengthReturnValue = 0, (), ()
 
-class Req(TorqExpressionWithExpr):
+class Require(TorqExpressionWithExpr):
+    ''' Require expression matches to a sequence which the internal expression matches.
+       When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
+    '''
+    
     __slots__ = [ ]
     
     def __init__(self, expr):
@@ -43,9 +47,13 @@ class Req(TorqExpressionWithExpr):
     def build(expr): 
         if isinstance(expr, ( Never, Epsilon )):
             return expr
-        return Req(expr)
+        return Require(expr)
 
-class Xcp(TorqExpressionWithExpr):
+class RequireBut(TorqExpressionWithExpr):
+    ''' Require expression matches to a sequence which the internal expression DOES NOT matches.
+       When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
+    '''
+    
     __slots__ = [ ]
     
     def __init__(self, expr):
@@ -62,7 +70,7 @@ class Xcp(TorqExpressionWithExpr):
     
     def seq_merged(self, right):
         if isinstance(right, Any):
-            return XcpThenAny.build(self.expr) 
+            return AnyBut.build(self.expr) 
 
     @staticmethod
     def build(expr): 
@@ -70,9 +78,13 @@ class Xcp(TorqExpressionWithExpr):
             return Never()
         elif isinstance(expr, Never):
             return Epsilon()
-        return Xcp(expr)
+        return RequireBut(expr)
 
 class EndOfNode(TorqExpression): # singleton
+    ''' EndOfNode expression matches to a position of end-of-sequence.
+       When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
+    '''
+    
     __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
@@ -85,6 +97,10 @@ class EndOfNode(TorqExpression): # singleton
     def build(): return EndOfNode()
 
 class BeginOfNode(TorqExpression): # singleton
+    ''' BeginOfNode expression matches to a position of beginning-of-sequence.
+       When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
+    '''
+    
     __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
@@ -100,7 +116,10 @@ class BeginOfNode(TorqExpression): # singleton
     @staticmethod
     def build(): return BeginOfNode()
 
-class XcpThenAny(TorqExpressionWithExpr):
+class AnyBut(TorqExpressionWithExpr):
+    ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()).
+    '''
+    
     __slots__ = [ ]
     
     def __init__(self, expr):
@@ -120,5 +139,5 @@ class XcpThenAny(TorqExpressionWithExpr):
             return Never()
         elif isinstance(expr, Never):
             return Any()
-        return XcpThenAny(expr)
+        return AnyBut(expr)
     

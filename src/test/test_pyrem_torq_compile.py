@@ -19,9 +19,9 @@ def compiling(exprLine):
     except pyrem_torq.expression.InterpretError, e:
         raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
     print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
-    exprs = pyrem_torq.script.convert_to_expression_object(seq)
-    print "exprs=", exprs
-    return exprs
+    expr = pyrem_torq.script.convert_to_expression_object(seq)
+    print "expr=", expr
+    return expr
 
 class TestTorqComile(unittest.TestCase):
     def test1st(self):
@@ -74,21 +74,20 @@ class TestTorqComile(unittest.TestCase):
         compiling('text :: ~(a <- (<>b | <>c));')
         
     def test14th(self):
-        exprs = compiling('text :: ~(ri"[a-z]" | i"f");')
+        compiling('text :: ~(ri"[a-z]" | i"f");')
     
     def test15th(self):
-        exprs = compiling("hoge <- <>fuga;")
-        assert len(exprs) == 1
+        compiling("hoge <- <>fuga;")
     
     def test16th(self):
         exprStr1 = "req^ a | b;"
-        exprs1 = compiling(exprStr1)
+        expr1 = compiling(exprStr1)
         exprStr2 = "req^(a | b);"
-        exprs2 = compiling(exprStr2)
+        expr2 = compiling(exprStr2)
         exprStr3 = "(req^ a) | b;"
-        exprs3 = compiling(exprStr3)
-        self.assertNotEqual(exprs1, exprs2)
-        self.assertEqual(exprs1, exprs3)
+        expr3 = compiling(exprStr3)
+        self.assertNotEqual(expr1, expr2)
+        self.assertEqual(expr1, expr3)
     
     def test17th(self):
         expr1 = compiling('"a", error("should not a");')
@@ -101,6 +100,11 @@ class TestTorqComile(unittest.TestCase):
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) (b);")
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) b;")
     
+    def test19th(self):
+        exprs = map(compiling, [ "", "\n", ";", ";\n" ])
+        for e in exprs:
+            self.assertEquals(e, None)
+
 if __name__ == '__main__':
     unittest.main()
     

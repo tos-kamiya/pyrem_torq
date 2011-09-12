@@ -1,4 +1,4 @@
-import itertools
+from itertools import chain as _chain
 
 from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
 
@@ -7,6 +7,10 @@ class InvalidRepetitionCount(ValueError): pass
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
+    ''' A base class of torq expression classes.
+        (Abstract class.)
+    '''
+    
     def __add__(self, other): return Seq.build(self, other)
     def __or__(self, other): return Or.build(self, other)
     
@@ -29,6 +33,12 @@ class TorqExpression(object):
         return Repeat.build(self, lower, upper)
             
     def match(self, inpSeq, inpPos):
+        ''' Do matching of the expression and input sequence.
+            If a substring inpSeq[inpPos:x] is matched by the expression (self),
+            returns a tuple of (length of matching substring, list of output nodes, list of dropped nodes).
+            Otherwise, returns a tuple (0, [], []).
+        '''
+        
         assert inpPos >= 1
         len_inpSeq = len(inpSeq)
         assert isinstance(inpSeq, list) and len_inpSeq >= 1
@@ -44,6 +54,12 @@ class TorqExpression(object):
         return p, o, d
     
     def parse(self, inpSeq, dropSeq=None):
+        ''' Do matching of the expression and input sequence.
+            If the entire inpSeq is matched by the expression (self),
+            returns list of output nodes.
+            Otherwise, returns None.
+        '''
+        
         p, o, d = self.match(inpSeq, 1)
         if 1 + p != len(inpSeq): return None
         if dropSeq is not None: dropSeq.extend(o)
@@ -75,6 +91,9 @@ class TorqExpression(object):
         return hash(self.__class__.__name__) + sum(hash(e) for e in TorqExpression.__call_extract_exprs_if_having(self))
 
 class TorqExpressionWithExpr(TorqExpression):
+    ''' (Abstract class.) intended to be used internally.
+    '''
+
     __slots__ = [ '_expr', '_expr_match_node', '_expr_match_lit', '_expr_match_eon' ]
     
     def getexpr(self): return self._expr
@@ -93,6 +112,9 @@ def _orflatener(exprs):
         else: yield e
 
 class Or(TorqExpression):
+    ''' Or expression matches a sequence, iff the sequence is matched by one of the internal expressions.
+    '''
+    
     __slots__ = [ '__exprs', '__ntbl_get', '__ltbl_get', '__elst', '__including_unknown_req', '__rnle' ]
     
     def __init__(self, *exprs):
@@ -129,7 +151,7 @@ class Or(TorqExpression):
                 for s in r[1]: ltbl[s].append(expr)
                 if r[2]: elst.append(expr)
             else:
-                for L in itertools.chain(ntbl.itervalues(), ltbl.itervalues(), [ elst ]):
+                for L in _chain(ntbl.itervalues(), ltbl.itervalues(), [ elst ]):
                     L.append(expr)
         return ntbl, ltbl, elst, None in list(r for _, r in exprAndReqs)
     
@@ -182,6 +204,10 @@ def _seqflatener(exprs):
         else: yield e
 
 class Seq(TorqExpression):
+    ''' Seq expression matches a sequence, iff the sequence is a concatenation of the sequences, s1, s2, ...
+    Here sequence s1 is matched by the 1st internal expression, s2 by 2nd, and so on.
+    '''
+    
     __slots__ = [ '__exprs', '__expr0', '__rnle', ]
     
     def getexprs(self): return self.__exprs
@@ -265,6 +291,12 @@ class Seq(TorqExpression):
                  Seq(*mergedExprs)
 
 class Repeat(TorqExpressionWithExpr):
+    ''' Repeat expression matches a sequence, iff a N-time repetition of the internal expression matches the sequence.
+        Here, N is a integer, lowerLimit <= N <= upperLimit.
+        If lowerLimist is None, it will be regarded as 0.
+        If upperLimit is None, it will be regarded as the infinite number.
+    '''
+    
     __slots__ = [ '__lowerLimit', '__upperLimit', '__rnle' ]
     
     def __init__(self, expr, lowerLimit, upperLimit):
@@ -369,9 +401,10 @@ class _RepeatZeroOrOne(Repeat):
         return self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) or _zeroLengthReturnValue
 
 class Search(TorqExpressionWithExpr):
-    # Search(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
-    # The difference is: when expr matches an empty sequence at some position of inpSeq,
-    # the former matches the entire input sequence. the latter matches the empty sequence.
+    ''' Search(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
+        The difference is: when expr matches an empty sequence at some position of inpSeq,
+        the former matches the entire input sequence. the latter matches the empty sequence.
+    '''
     
     __slots__ = [ '__rnle' ]
     
@@ -461,6 +494,9 @@ class Epsilon(TorqExpression): # singleton
     def build(): return Epsilon()
     
 class Any(TorqExpression): # singleton
+    ''' Any expression matches any length-1 sequence.
+    '''
+    
     __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
 
@@ -471,6 +507,9 @@ class Any(TorqExpression): # singleton
     def build(): return Any()
 
 class Never(TorqExpression): # singleton
+    ''' Never expression does not match any sequence.
+    '''
+    
     __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     

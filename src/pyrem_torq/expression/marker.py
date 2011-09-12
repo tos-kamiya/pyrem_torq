@@ -1,6 +1,13 @@
 from base_expression import *
 
 class Marker(TorqExpression):
+    ''' A special expression, which is used as a place holder of an expression.
+        A marker object has two properties: name and expr.
+        The name property is a label of the marker object.
+        The expr property is an internal expression of the marker object.
+        When evaluated an expression, a marker object behaves as if it were the internal expression.
+    '''
+
     __slots__ = [ '__name', '__expr' ]
     
     def __init__(self, name):
@@ -81,7 +88,7 @@ def __lookup_replaces(expr, *args):
         tbl = args[0]
     assert isinstance(tbl, dict)
     
-    replaceTable = dict(( marker, replacementExpr ) for marker, replacementExpr in tbl.items()) 
+    replaceTable = dict(tbl.iteritems())
     targetMarkers = [e for e in inner_expr_iter(expr) if isinstance(e, Marker) and e.name in replaceTable]
     return replaceTable, targetMarkers
 
@@ -94,13 +101,13 @@ def assign_marker_expr(expr, *args):
         replacedMarkers.append(e)
     return replacedMarkers
     
-def update_marker_expr(expr, *args):
-    replaceTable, targetMarkers = __lookup_replaces(expr, *args)
-    replacedMarkers = []        
-    for e in targetMarkers:
-        e.expr = replaceTable[e.name]
-        replacedMarkers.append(e)
-    return replacedMarkers
+#def update_marker_expr(expr, *args):
+#    replaceTable, targetMarkers = __lookup_replaces(expr, *args)
+#    replacedMarkers = []        
+#    for e in targetMarkers:
+#        e.expr = replaceTable[e.name]
+#        replacedMarkers.append(e)
+#    return replacedMarkers
 
 def free_marker_iter(expr):
     for e in inner_expr_iter(expr):
@@ -126,6 +133,11 @@ _notGiven = object()
 class ItemOverwriteError(KeyError): pass
 
 class ExprDict(dict):
+    ''' A special dict, which aims to store expressions.
+       When an expression is newly added, marker objects in the expression and
+       marker objects in all expressions stored in the dict will be automatically assigned.
+   '''
+   
     def set_silent_overwrite(self, permitOverwrite):
         self.__permitOverwrite = permitOverwrite
     

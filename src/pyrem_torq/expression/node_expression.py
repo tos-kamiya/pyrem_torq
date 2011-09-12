@@ -13,6 +13,9 @@ class ForbiddenNewLabel(ValueError):
     pass
 
 class Node(TorqExpression):
+    ''' Node expression matches to a length-1 sequence of a node whose label is the same to the internal label.
+    '''
+    
     __slots__ = [ '__label', '__newLabel' ]
         
     def getlabel(self): return self.__label
@@ -62,6 +65,9 @@ class Node(TorqExpression):
     def build(label, newLabel=None): return Node(label, newLabel)
 
 class AnyNode(TorqExpression):
+    ''' Node expression matches to a length-1 sequence of a node.
+    '''
+    
     __slots__ = [ '__newLabel' ]
         
     def getnewlabel(self): return self.__newLabel
@@ -99,6 +105,11 @@ class AnyNode(TorqExpression):
     def build(newLabel=None): return AnyNode(newLabel)
 
 class NodeMatch(TorqExpressionWithExpr):
+    ''' NodeMatch expression matches to a length-1 sequence of a node iff 
+       - the label of the node is the same to the internal label, and 
+       - the internal expression matches the node's internal sequence.
+    '''
+    
     __slots__ = [ '__label', '__newLabel' ]
     
     def getlabel(self): return self.__label
@@ -158,6 +169,10 @@ class NodeMatch(TorqExpressionWithExpr):
     def build(label, expr, newLabel=None): return NodeMatch(label, expr, newLabel)
 
 class AnyNodeMatch(TorqExpressionWithExpr):
+    ''' NodeMatch expression matches to a length-1 sequence of a node iff 
+        the internal expression matches the node's internal sequence.
+    '''
+    
     __slots__ = [ '__newLabel' ]
     
     def getnewlabel(self): return self.__newLabel
@@ -206,6 +221,10 @@ class AnyNodeMatch(TorqExpressionWithExpr):
     def build(expr, newLabel=None): return AnyNodeMatch(expr, newLabel)
 
 class NodeClass(TorqExpression):
+    ''' NodeMatch expression matches to a length-1 sequence of a node whose
+        label is the same to one of the internal labels.
+    '''
+    
     __slots__ = [ '__newLabel', '__labels' ]
     
     def getlabels(self): return sorted(self.__labels)
@@ -273,6 +292,10 @@ class NodeClass(TorqExpression):
     def build(labels, newLabel=None): return NodeClass(labels, newLabel)
 
 class InsertNode(TorqExpression):
+    ''' InsertNode expression always matches, and inserts a node having the label at the
+        current position in the output sequence.
+    '''
+    
     __slots__ = [ '__newLabel' ]
     
     def getnewlabel(self): return self.__newLabel
@@ -301,6 +324,11 @@ class InsertNode(TorqExpression):
     def build(newLabel): return InsertNode(newLabel)
 
 class BuildToNode(TorqExpressionWithExpr):
+    ''' BuildToNode expression matches to a sequence which the internal expression matches.
+       When matches, inserts a node at the current position in the output sequence and
+       makes the matched sequence to internal sequence of the inserted node. 
+    '''
+    
     __slots__ = [ '__newLabel' ]
     
     def getnewlabel(self): return self.__newLabel
@@ -357,6 +385,10 @@ class BuildToNode(TorqExpressionWithExpr):
         return BuildToNode(newLabel, expr)
 
 class Drop(TorqExpressionWithExpr):
+    ''' Drop expression matches to a sequence which the internal expression matches.
+       When matches, appends the matched sequence the current dropped sequence.
+    '''
+    
     __slots__ = [ ]
     
     def __init__(self, expr):
