@@ -57,29 +57,29 @@ class TestTorqComile(unittest.TestCase):
 #        exprs2 = compiling(exprStr)
 #        self.assertTrue(exprs == exprs2)
 
-    def test9th(self):
+    def test8th(self):
         exprStr = "(hoge <-), <>huga, (<>boo :: a), (<>foo :: ~b);"
         compiling(exprStr)
     
-    def test10th(self):
+    def test9th(self):
         compiling('text :: ~?("a" | @0);')
     
-    def test11th(self):
+    def test10th(self):
         compiling('text :: ~eof;')
     
-    def test12th(self):
+    def test11th(self):
         compiling('text :: ~(any^(eof, a) | *any^(eof));')
     
-    def test13th(self):
+    def test12th(self):
         compiling('text :: ~(a <- (<>b | <>c));')
         
-    def test14th(self):
+    def test13th(self):
         compiling('text :: ~(ri"[a-z]" | i"f");')
     
-    def test15th(self):
+    def test14th(self):
         compiling("hoge <- <>fuga;")
     
-    def test16th(self):
+    def test15th(self):
         exprStr1 = "req^ a | b;"
         expr1 = compiling(exprStr1)
         exprStr2 = "req^(a | b);"
@@ -89,21 +89,24 @@ class TestTorqComile(unittest.TestCase):
         self.assertNotEqual(expr1, expr2)
         self.assertEqual(expr1, expr3)
     
-    def test17th(self):
+    def test16th(self):
         expr1 = compiling('"a", error("should not a");')
         expr2 = compiling('"a", error "should not a";')
         self.assertEqual(expr1, expr2)
         
-    def test18th(self):
+    def test17th(self):
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "a b;")
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "a (b);")
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) (b);")
         self.assertRaises(pyrem_torq.script.CompileError, compiling, "(a) b;")
     
-    def test19th(self):
+    def test18th(self):
         exprs = map(compiling, [ "", "\n", ";", ";\n" ])
         for e in exprs:
             self.assertEquals(e, None)
+
+    def test19th(self):
+        self.assertRaises(pyrem_torq.script.CompileError, compiling, "@undefined_label;")
 
 if __name__ == '__main__':
     unittest.main()

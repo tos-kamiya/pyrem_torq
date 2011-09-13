@@ -7,29 +7,12 @@ import pyrem_torq.treeseq
 
 import unittest
 
-to_gsublike_expr = pyrem_torq.expression.Search.build
-
-#def my_compile(exprStr, recursionAtMarker0=True):
-#    try:
-#        seq = pyrem_torq.script.parse_to_ast(exprStr, sys.stderr)
-#    except pyrem_torq.expression.InterpretError, e:
-#        raise pyrem_torq.script.CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ))
-#    #print "ast=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
-#    
-#    exprs = pyrem_torq.script.convert_to_expression_object(seq)
-#    
-#    if recursionAtMarker0:
-#        for expr in exprs:
-#            expr.replace_marker_expr("0", expr)
-#    
-#    return exprs
-
 def compile_exprs(exprStrs):
     exprs = []
     for exprStr in exprStrs:
         expr = pyrem_torq.script.compile(exprStr)
-        #expr = my_compile(exprStr)
         
+        expr = expr.optimized()
         exprs.append(expr)
     return exprs
 
@@ -91,12 +74,12 @@ int main(int argc, char *argv[])
         print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
     
     def test4th(self):
-        IN = pyrem_torq.expression.InsertNode.build
-        BtN = pyrem_torq.expression.BuildToNode.build
-        L = pyrem_torq.expression.Literal.build
-        A = pyrem_torq.expression.Any.build
-        Q = pyrem_torq.expression.Require.build
-        S = pyrem_torq.expression.Search.build
+        IN = pyrem_torq.expression.InsertNode
+        BtN = pyrem_torq.expression.BuildToNode
+        L = pyrem_torq.expression.Literal
+        A = pyrem_torq.expression.Any
+        Q = pyrem_torq.expression.Require
+        S = pyrem_torq.expression.Search
         
         eolExpr = BtN('eol', L("\r\n") | L("\n") | L("\r"))
         expr = S(eolExpr) + Q(pyrem_torq.expression.EndOfNode()) + IN('eof')

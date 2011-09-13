@@ -1,18 +1,14 @@
 from itertools import chain as _chain
 
-from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
-
 class InvalidRepetitionCount(ValueError): pass
 
 _zeroLengthReturnValue = 0, (), ()
 
 class TorqExpression(object):
-    ''' A base class of torq expression classes.
-        (Abstract class.)
-    '''
+    ''' A base class of torq expression classes. (Abstract class.) '''
     
-    def __add__(self, other): return Seq.build(self, other)
-    def __or__(self, other): return Or.build(self, other)
+    def __add__(self, other): return Seq(self, other)
+    def __or__(self, other): return Or(self, other)
     
     def __rmul__(self, left):
         if isinstance(left, list):
@@ -30,7 +26,7 @@ class TorqExpression(object):
         else:
             raise InvalidRepetitionCount("Invalid type for repeat specifier")
         assert upper is None or lower <= upper
-        return Repeat.build(self, lower, upper)
+        return Repeat(self, lower, upper)
             
     def match(self, inpSeq, inpPos):
         ''' Do matching of the expression and input sequence.
@@ -80,19 +76,36 @@ class TorqExpression(object):
     def __call_extract_exprs_if_having(self):
         return list(self.extract_exprs()) if hasattr(self, "extract_exprs") else []
     
-    def __eq__(self, right):
-        ex = TorqExpression.__call_extract_exprs_if_having
-        return isinstance(right, self.__class__) and ex(self) == ex(right)
+    def _eq_i(self, right, alreadyComparedExprs):
+        selfId = id(self)
+        
+        rightIdWhenSelfIsFoundInComparedExprs = alreadyComparedExprs.get(selfId, None)
+        if rightIdWhenSelfIsFoundInComparedExprs is not None:
+            return id(right) == rightIdWhenSelfIsFoundInComparedExprs
+        rightId = id(right)
+
+        alreadyComparedExprs[selfId] = rightId
+        if isinstance(right, self.__class__):
+            ex = TorqExpression.__call_extract_exprs_if_having
+            for es, er in zip(ex(self), ex(right)):
+                if not es._eq_i(er, alreadyComparedExprs):
+                    return False
+            else:
+                return True
+        return False
+    
+    def __eq__(self, right): return self._eq_i(right, dict())
     
     def __repr__(self): 
         return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, TorqExpression.__call_extract_exprs_if_having(self))) )
         
     def __hash__(self):
         return hash(self.__class__.__name__) + sum(hash(e) for e in TorqExpression.__call_extract_exprs_if_having(self))
+    
+    def optimized(self, objectpool={}): return self
 
 class TorqExpressionWithExpr(TorqExpression):
-    ''' (Abstract class.) intended to be used internally.
-    '''
+    ''' (Abstract class.) intended to be used internally. '''
 
     __slots__ = [ '_expr', '_expr_match_node', '_expr_match_lit', '_expr_match_eon' ]
     
@@ -105,9 +118,24 @@ class TorqExpressionWithExpr(TorqExpression):
     
     def extract_exprs(self): return [ self._expr ]
 
+class TorqExpressionSingleton(TorqExpression):
+    ''' (Abstract class.) intended to be used internally. '''
+    __slots__ = [ ]
+    
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ == self.__class__
+
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e.__class__ is self.__class__:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
+    
 def _orflatener(exprs):
     for e in exprs:
-        if isinstance(e, Or):
+        if e.__class__ is Or:
             for i in _orflatener(e.exprs): yield i
         else: yield e
 
@@ -181,10 +209,9 @@ class Or(TorqExpression):
 
     def required_node_literal_epsilon(self): return self.__rnle
             
-    @staticmethod
-    def build(*exprs):
-        exprs = list(_orflatener(exprs))
-        if not exprs: return Never()
+    def optimized(self, objectpool={}):
+        exprs = list(_orflatener(self.__exprs))
+        if not exprs: return Never().optimized(objectpool)
         mergedExprs = [ exprs[0] ]
         for e in exprs[1:]:
             prev = mergedExprs[-1]
@@ -193,13 +220,13 @@ class Or(TorqExpression):
                 mergedExprs[-1] = m
             else:
                 mergedExprs.append(e)
-        return Never() if not mergedExprs else \
+        return Never().optimized(objectpool) if not mergedExprs else \
                  mergedExprs[0] if len(mergedExprs) == 1 else \
                  Or(*mergedExprs)
 
 def _seqflatener(exprs):
     for e in exprs:
-        if isinstance(e, Seq):
+        if e.__class__ is Seq:
             for i in _seqflatener(e.exprs): yield i
         else: yield e
 
@@ -274,10 +301,9 @@ class Seq(TorqExpression):
     def required_node_literal_epsilon(self):
         return self.__rnle
             
-    @staticmethod
-    def build(*exprs):
-        exprs = list(_seqflatener(exprs))
-        if not exprs: return Epsilon()
+    def optimized(self, objectpool={}):
+        exprs = list(_seqflatener(self.__exprs))
+        if not exprs: return Epsilon().optimized(objectpool)
         mergedExprs = [ exprs[0] ]
         for e in exprs[1:]:
             prev = mergedExprs[-1]
@@ -286,10 +312,10 @@ class Seq(TorqExpression):
                 mergedExprs[-1] = m
             else:
                 mergedExprs.append(e)
-        return Epsilon() if not mergedExprs else \
+        return Epsilon().optimized(objectpool) if not mergedExprs else \
                  mergedExprs[0] if len(mergedExprs) == 1 else \
                  Seq(*mergedExprs)
-
+        
 class Repeat(TorqExpressionWithExpr):
     ''' Repeat expression matches a sequence, iff a N-time repetition of the internal expression matches the sequence.
         Here, N is a integer, lowerLimit <= N <= upperLimit.
@@ -354,10 +380,12 @@ class Repeat(TorqExpressionWithExpr):
             return 0, o * self.__lowerLimit, ()
         return _zeroLengthReturnValue
     
-    def __eq__(self, right): 
-        return isinstance(right, Repeat) and self.expr == right.expr and \
-                self.__lowerLimit == right.__lowerLimit and self.__upperLimit == right.__upperLimit
-    
+    def _eq_i(self, right, alreadyComparedExprs):
+        rightClassIsRpeatOrRepeatZeroOrOne = isinstance(right, Repeat) # this line could be "... = right.__class__ is Repeat or right.__class__ is RepeatZeroOrOne", if the language permits to write so.
+        return rightClassIsRpeatOrRepeatZeroOrOne and \
+                self.__lowerLimit == right.__lowerLimit and self.__upperLimit == right.__upperLimit and \
+                self.expr._eq_i(right, alreadyComparedExprs)
+        
     def __repr__(self): 
         return "Repeat(%s,%s,%s)" % ( repr(self.expr), repr(self.__lowerLimit), repr(self.__upperLimit) )
     
@@ -374,17 +402,19 @@ class Repeat(TorqExpressionWithExpr):
     @staticmethod
     def OneOrMore(expr): return Repeat(expr, 1, None)
     
-    @staticmethod
-    def build(expr, lowerLimit, upperLimit):
-        LU = lowerLimit, upperLimit
-        if LU == (0, 0): return Epsilon()
+    def optimized(self, objectpool={}):
+        LU = self.__lowerLimit, self.__upperLimit
+        if LU == (0, 0) or self.expr.__class__ is Epsilon: return Epsilon().optimized(objectpool)
+        if LU[0] != 0 and self.expr.__class__ is Never: return Never().optimized(objectpool)
         else:
-            if isinstance(expr, Search): return expr
-            elif LU == (0, 1): return Repeat.ZeroOrOne(expr)
-            elif LU == (0, None): return Repeat.ZeroOrMore(expr)
-            elif LU == (1, None): return Repeat.OneOrMore(expr)
-            else: return Repeat(expr, lowerLimit, upperLimit)
-
+            seo = self.expr.optimized(objectpool)
+            if self.expr.__class__ is Search: return seo
+            elif LU == (0, 1): return Repeat.ZeroOrOne(seo)
+            elif LU == (0, None): return Repeat.ZeroOrMore(seo)
+            elif LU == (1, 1): return seo
+            elif LU == (1, None): return Repeat.OneOrMore(seo)
+            else: return self
+        
 class _RepeatZeroOrOne(Repeat):
     __slots__ = [ ]
     
@@ -443,12 +473,11 @@ class Search(TorqExpressionWithExpr):
     
     def required_node_literal_epsilon(self): return self.__rnle
     
-    @staticmethod
-    def build(expr): 
-        if isinstance(expr, Search):
-            return expr
-        return Search(expr)
-
+    def optimized(self, objectpool={}):
+        if self.expr.__class__ is Search:
+            return self.expr.optimized(objectpool)
+        return self
+        
 class InterpretError(StandardError):
     def __init__(self, message):
         StandardError.__init__(self, message)
@@ -476,11 +505,14 @@ class ErrorExpr(TorqExpression):
     def __repr__(self): return "ErrorExpr(%s)" % repr(self.message)
     def __hash__(self): return hash("ErrorExpr") + hash(self.message)
 
-    @staticmethod
-    def build(message): return ErrorExpr(message)
-
-class Epsilon(TorqExpression): # singleton
-    __metaclass__ = _SingletonWoInitArgs
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is ErrorExpr and self.message == right.message
+                
+    def optimized(self, objectpool={}): return self
+    
+class Epsilon(TorqExpressionSingleton):
+    ''' Epsilon expression matches any zero-length sequence.
+    '''
     __slots__ = [ ]
     
     def _match_node(self, inpSeq, inpPos, lookAhead): return _zeroLengthReturnValue
@@ -490,31 +522,24 @@ class Epsilon(TorqExpression): # singleton
     def seq_merged(self, other): return other
     def or_merged(self, other): return self
     
-    @staticmethod
-    def build(): return Epsilon()
-    
-class Any(TorqExpression): # singleton
+class Any(TorqExpressionSingleton):
     ''' Any expression matches any length-1 sequence.
     '''
     
-    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
 
     def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ], ()
     _match_lit = _match_node
     
-    @staticmethod
-    def build(): return Any()
-
-class Never(TorqExpression): # singleton
+class Never(TorqExpressionSingleton):
     ''' Never expression does not match any sequence.
     '''
     
-    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
+    
+    def _match_node(self, inpSeq, inpPos, lookAhead): return None
+    _match_lit = _match_eon = _match_node
     
     def seq_merged(self, other): return self
     def or_merged(self, other): return other
     
-    @staticmethod
-    def build(): return Never()

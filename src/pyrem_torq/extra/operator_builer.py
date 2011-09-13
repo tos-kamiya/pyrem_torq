@@ -29,10 +29,10 @@ class OperatorBuilder(object):
     def get_generated_term_label(self, label): return self.__gtl
     generated_term_label = property(get_generated_term_label, set_generated_term_label)
     
-    def _make_term_expr(self):
+    def _make_term_expr(self, expr0):
         terms = [ self.__ate ]
-        terms.extend(NodeMatch(lbl, Search(Marker('0'))) for lbl in self.__ctnls)
-        return Or.build(*terms)
+        terms.extend(NodeMatch(lbl, Search(expr0)) for lbl in self.__ctnls)
+        return Or(*terms)
     
     def build_Ot_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
@@ -50,18 +50,18 @@ class OperatorBuilder(object):
         opBeginExprs.extend(signLikeExprs)
         opBeginExprs.extend(opOpen for opOpen, opClose in castLikeExprs)
             
-        termExpr = self._make_term_expr()
+        expr0 = Holder()
+        termExpr = self._make_term_expr(expr0)
         
-        expr0 = Marker('0')
         ovExprs = []
         for opOpen, opClose in castLikeExprs:
             e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             ovExprs.append(e)
         ovExprs.extend(signLikeExprs)
         
-        whereShouldNotBeRegardedAsOperator = [0,1] * Or.build(*opBeginExprs)
-        expr = BuildToNode(self.__gtl, [1,None] * Or.build(*ovExprs) + termExpr) + whereShouldNotBeRegardedAsOperator
-        # this "+ [0,1] * Or.build(*opBeinExprs)" is used to neglect the operator appears after some term.
+        whereShouldNotBeRegardedAsOperator = [0,1] * Or(*opBeginExprs)
+        expr = BuildToNode(self.__gtl, [1,None] * Or(*ovExprs) + termExpr) + whereShouldNotBeRegardedAsOperator
+        # this "+ [0,1] * Or(*opBeinExprs)" is used to neglect the operator appears after some term.
         
         expr0.expr = expr | (termExpr + whereShouldNotBeRegardedAsOperator)
         return Search(expr0)
@@ -78,13 +78,13 @@ class OperatorBuilder(object):
                 opOpen, opClose = op
                 callLikeExprs.append(( opOpen, opClose ))
         
-        termExpr = self._make_term_expr()
+        expr0 = Holder()
+        termExpr = self._make_term_expr(expr0)
         
         terms = [ self.__ate ]
         terms.extend(Node(lbl) for lbl in self.__ctnls)
-        whereTermShouldNotAppear = RequireBut(Or.build(*terms))
+        whereTermShouldNotAppear = RequireBut(Or(*terms))
         
-        expr0 = Marker('0')
         voExprs = []
         for opOpen, opClose in callLikeExprs:
             e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose + whereTermShouldNotAppear
@@ -93,7 +93,7 @@ class OperatorBuilder(object):
             e = op + whereTermShouldNotAppear
             voExprs.append(e)
         
-        expr = BuildToNode(self.__gtl, termExpr + [1,None] * Or.build(*voExprs))
+        expr = BuildToNode(self.__gtl, termExpr + [1,None] * Or(*voExprs))
         expr0.expr = expr | termExpr
         return Search(expr0)
     
@@ -110,31 +110,31 @@ class OperatorBuilder(object):
                 opOpen, opClose = op
                 conditionLikeExprs.append(( opOpen, opClose ))
         
-        termExpr = self._make_term_expr()
+        expr0 = Holder()
+        termExpr = self._make_term_expr(expr0)
         
-        expr0 = Marker('0')
         vowExprs = []
         for opOpen, opClose in conditionLikeExprs:
             e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             vowExprs.append(e)
         vowExprs.extend(addLikeExprs)
         
-        expr = BuildToNode(self.__gtl, termExpr + [1,None] * (Or.build(*vowExprs) + termExpr))
+        expr = BuildToNode(self.__gtl, termExpr + [1,None] * (Or(*vowExprs) + termExpr))
         expr0.expr = expr | termExpr
         return Search(expr0)
     
     def build_O_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
         
-        termExpr = self._make_term_expr()
+        expr0 = Holder()
+        termExpr = self._make_term_expr(expr0)
         
-        expr0 = Marker('0')
         ovpExprs = []
         for opOpen, opClose in ops:
             e = BuildToNode(self.__gtl, opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose)
             ovpExprs.append(e)
         ovpExprs.append(termExpr)
-        expr = Or.build(*ovpExprs)
+        expr = Or(*ovpExprs)
         expr0.expr = expr | termExpr
         return Search(expr0)
 

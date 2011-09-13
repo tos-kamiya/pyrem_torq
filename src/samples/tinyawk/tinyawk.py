@@ -9,7 +9,6 @@
 # - all numbers are integers, no floating points.
 # - assignment to NF, NR or $* is undefined behavior.
 
-import re
 from pyrem_torq import *
 from pyrem_torq.expression import *
 

@@ -46,8 +46,8 @@ class Node(TorqExpression):
                 return 1, ( newNode, ), ()
         #return None
     
-    def __eq__(self, right): 
-        return isinstance(right, Node) and self.__label == right.label and \
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Node and self.__label == right.label and \
                 self.__newLabel == right.newLabel
     
     def __repr__(self): return "Node(%s,newLabel=%s)" % ( repr(self.__label), repr(self.__newLabel) )
@@ -57,12 +57,17 @@ class Node(TorqExpression):
         return ( self.__label, ), (), False
             
     def or_merged(self, other):
-        if isinstance(other, ( Node, NodeClass, AnyNode )):
+        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
             return NodeClass.merged([ self, other ])
         return None
-    
-    @staticmethod
-    def build(label, newLabel=None): return Node(label, newLabel)
+
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
 
 class AnyNode(TorqExpression):
     ''' Node expression matches to a length-1 sequence of a node.
@@ -90,20 +95,25 @@ class AnyNode(TorqExpression):
             newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
             return 1, ( newNode, ), ()
     
-    def __eq__(self, right): 
-        return isinstance(right, AnyNode) and self.__newLabel == right.newLabel
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is AnyNode and self.__newLabel == right.newLabel
     
     def __repr__(self): return "AnyNode(newLabel=%s)" % repr(self.__newLabel)
     def __hash__(self): return hash("AnyNode") + hash(self.__newLabel)
     
     def or_merged(self, other):
-        if isinstance(other, ( Node, NodeClass, AnyNode )):
+        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
             return NodeClass.merged([ self, other ])
         return None
-    
-    @staticmethod
-    def build(newLabel=None): return AnyNode(newLabel)
 
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
+    
 class NodeMatch(TorqExpressionWithExpr):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
        - the label of the node is the same to the internal label, and 
@@ -153,9 +163,10 @@ class NodeMatch(TorqExpressionWithExpr):
             newNode.extend(o)
             return 1, ( newNode, ), d
 
-    def __eq__(self, right): 
-        return isinstance(right, NodeMatch) and self.__label == right.label and \
-                self.expr == right.expr and self.__newLabel == right.newLabel
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is NodeMatch and \
+                self.__label == right.label and self.__newLabel == right.newLabel and \
+                self.expr._eq_i(right.expr)
     
     def __repr__(self): return "NodeMatch(%s,%s,newLabel=%s)" % \
             ( repr(self.__label), repr(self.expr), repr(self.__newLabel) )
@@ -165,8 +176,11 @@ class NodeMatch(TorqExpressionWithExpr):
     def required_node_literal_epsilon(self):
         return ( self.__label, ), (), False
             
-    @staticmethod
-    def build(label, expr, newLabel=None): return NodeMatch(label, expr, newLabel)
+    def optimized(self, objectpool={}):
+        optimizedExpr = self.expr.optimized(objectpool)
+        if optimizedExpr is not self.expr:
+            return NodeMatch(self.__label, self.expr, newLabel=self.__newLabel)
+        return self
 
 class AnyNodeMatch(TorqExpressionWithExpr):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
@@ -208,17 +222,19 @@ class AnyNodeMatch(TorqExpressionWithExpr):
             newNode.extend(o)
             return 1, ( newNode, ), d
 
-    def __eq__(self, right): 
-        return isinstance(right, AnyNodeMatch) and self.expr == right.expr and \
-                self.__newLabel == right.newLabel
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is AnyNodeMatch and self.__newLabel == right.newLabel
     
     def __repr__(self): return "NodeMatch(%s,newLabel=%s)" % \
             ( repr(self.expr), repr(self.__newLabel) )
             
     def __hash__(self): return hash("AnyNodeMatch") + hash(self.expr) + hash(self.__newLabel)
 
-    @staticmethod
-    def build(expr, newLabel=None): return AnyNodeMatch(expr, newLabel)
+    def optimized(self, objectpool={}):
+        optimizedExpr = self.expr.optimized(objectpool)
+        if optimizedExpr is not self.expr:
+            return AnyNodeMatch(self.expr, newLabel=self.__newLabel)
+        return self
 
 class NodeClass(TorqExpression):
     ''' NodeMatch expression matches to a length-1 sequence of a node whose
@@ -255,9 +271,9 @@ class NodeClass(TorqExpression):
                 return 1, ( newNode, ), ()
         #return None
     
-    def __eq__(self, right): 
-        return isinstance(right, NodeClass) and self.__labels == right.__labels and \
-                self.__newLabel == right.newLabel
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is NodeClass and self.__labels == right.__labels and \
+                self.__newLabel == right.__newLabel
     
     def __repr__(self): return "NodeClass([%s],newLabel=%s)" % ( ",".join(repr(lbl) for lbl in sorted(self.__labels)), repr(self.__newLabel) )
     def __hash__(self): return hash("NodeClass") + sum(map(hash, self.__labels)) + hash(self.__newLabel)
@@ -266,7 +282,7 @@ class NodeClass(TorqExpression):
         return tuple(sorted(self.__labels)), (), False
             
     def or_merged(self, other):
-        if isinstance(other, ( Node, NodeClass, AnyNode )):
+        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
             return NodeClass.merged([ self, other ])
         return None
 
@@ -280,16 +296,21 @@ class NodeClass(TorqExpression):
         
         labelSet = set()
         for item in nodeExprOrNodeClasss:
-            if isinstance(item, AnyNode):
-                return AnyNode.build(newLabel=theNewLabel)
-            if isinstance(item, Node):
+            if item.__class__ is AnyNode:
+                return AnyNode(newLabel=theNewLabel)
+            if item.__class__ is Node:
                 labelSet.add(item.label)
-            elif isinstance(item, NodeClass):
+            elif item.__class__ is NodeClass:
                 labelSet.update(item.__labels)
-        return NodeClass.build(labelSet, newLabel=theNewLabel)
+        return NodeClass(labelSet, newLabel=theNewLabel)
 
-    @staticmethod
-    def build(labels, newLabel=None): return NodeClass(labels, newLabel)
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
 
 class InsertNode(TorqExpression):
     ''' InsertNode expression always matches, and inserts a node having the label at the
@@ -314,14 +335,19 @@ class InsertNode(TorqExpression):
     def required_node_literal_epsilon(self):
         return (), (), True
             
-    def __eq__(self, right): 
-        return isinstance(right, InsertNode) and self.__newLabel == right.newLabel
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is InsertNode and self.__newLabel == right.newLabel
     
     def __repr__(self): return "InsertNode(%s)" % repr(self.__newLabel) 
     def __hash__(self): return hash("InsertNode") + hash(self.__newLabel)
 
-    @staticmethod
-    def build(newLabel): return InsertNode(newLabel)
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
 
 class BuildToNode(TorqExpressionWithExpr):
     ''' BuildToNode expression matches to a sequence which the internal expression matches.
@@ -358,9 +384,9 @@ class BuildToNode(TorqExpressionWithExpr):
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         return self.__make_return_value(self._expr._match_eon(inpSeq, inpPos, lookAheadDummy))
     
-    def __eq__(self, right): 
-        return isinstance(right, BuildToNode) and self.__newLabel == right.newLabel and \
-                self.expr == right.expr
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is BuildToNode and self.__newLabel == right.__newLabel and \
+                self.expr._eq_i(right.expr, alreadyComparedExprs)
     
     def __repr__(self): return "BuildToNode(%s,%s)" % (repr(self.__newLabel), repr(self.expr) )
     def __hash__(self): return hash("BuildToNode") + hash(self.__newLabel) + hash(self.expr)
@@ -368,21 +394,25 @@ class BuildToNode(TorqExpressionWithExpr):
     def required_node_literal_epsilon(self):
         return self.expr.required_node_literal_epsilon()
             
-    @staticmethod
-    def build(newLabel, expr): 
-        if isinstance(expr, Epsilon):
-            return InsertNode(newLabel)
-        elif isinstance(expr, Never):
-            return expr
-        elif isinstance(expr, Node) and expr.newLabel is FLATTEN:
-            return Node(expr.label, newLabel=newLabel)
-        elif isinstance(expr, NodeMatch) and expr.newLabel is FLATTEN:
-            return NodeMatch(expr.label, expr.expr, newLabel=newLabel)
-        elif isinstance(expr, AnyNode) and expr.newLabel is FLATTEN:
-            return AnyNode(newLabel=newLabel)
-        elif isinstance(expr, NodeClass) and expr.newLabel is FLATTEN:
-            return NodeClass(expr.labels, newLabel=newLabel)
-        return BuildToNode(newLabel, expr)
+    def optimized(self, objectpool={}):
+        expr = self.expr
+        newLabel = self.__newLabel
+        if expr.__class__ is Epsilon:
+            return InsertNode(self.__newLabel).optimized(objectpool)
+        elif expr.__class__ is Never:
+            return expr.optimized(objectpool)
+        elif expr.__class__ is Node and expr.newLabel is FLATTEN:
+            return Node(expr.label, newLabel=newLabel).optimized(objectpool)
+        elif expr.__class__ is NodeMatch and expr.newLabel is FLATTEN:
+            return NodeMatch(expr.label, expr.expr, newLabel=newLabel).optimized(objectpool)
+        elif expr.__class__ is AnyNode and expr.newLabel is FLATTEN:
+            return AnyNode(newLabel=newLabel).optimized(objectpool)
+        elif expr.__class__ is NodeClass and expr.newLabel is FLATTEN:
+            return NodeClass(expr.labels, newLabel=newLabel).optimized(objectpool)
+        optimizedExpr = expr.optimized(objectpool)
+        if optimizedExpr is not expr:
+            return BuildToNode(self.__newLabel, optimizedExpr)
+        return self
 
 class Drop(TorqExpressionWithExpr):
     ''' Drop expression matches to a sequence which the internal expression matches.
@@ -416,8 +446,10 @@ class Drop(TorqExpressionWithExpr):
     def required_node_literal_epsilon(self):
         return self.expr.required_node_literal_epsilon()
             
-    @staticmethod
-    def build(expr): 
-        if isinstance(expr, ( Epsilon, Never )):
-            return expr
-        return Drop(expr)
+    def optimized(self, objectpool={}):
+        if self.expr.__class__ is Epsilon or self.expr.__class__ is Never:
+            return self.expr.optimized(objectpool)
+        optimizedExpr = self.expr.optimized(objectpool)
+        if optimizedExpr is not self.expr:
+            return Drop(optimizedExpr)
+        return self

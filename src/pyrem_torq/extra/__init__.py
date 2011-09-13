@@ -1,4 +1,3 @@
-#import expression_shortname
 import operator_builer
 
 # other stuff

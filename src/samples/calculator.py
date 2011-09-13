@@ -2,38 +2,42 @@ import re, collections
 import pyrem_torq
 from pyrem_torq.expression import *
 
-BtN = BuildToNode.build
-L = Literal.build
-LC = LiteralClass.build
-M = Marker.build
-NM = NodeMatch.build
+BtN = BuildToNode
+L = Literal
+LC = LiteralClass
+NM = NodeMatch
 
 def tokenize(text):
     return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
 
 def _build_parsing_exprs():    
-    def to_recursive(expr): 
-        assign_marker_expr(expr, '0', expr) 
-        return expr
     r = []
     
     # atomic
-    parenV = BtN('v', Drop(L('(')) + [0,None]*(RequireBut(L(')')) + M('0')) + Drop(L(')')))
+    expr0 = Holder()
+    parenV = BtN('v', Drop(L('(')) + [0,None]*(RequireBut(L(')')) + expr0) + Drop(L(')')))
     numberV = BtN('v', Rex(r"^(\d|[.])"))
-    r.append(Search(to_recursive(parenV | numberV | Any())))
+    expr0.expr = parenV | numberV | Any()
+    r.append(Search(expr0.expr))
 
     # unary +,-
-    vSearch = NM('v', Search(M('0')))
+    expr0 = Holder()
+    vSearch = NM('v', Search(expr0))
     signV = BtN('v', (LC('+-')) + vSearch) + [0,1]*LC('+-')
-    r.append(to_recursive([0,1]*signV + [0,None]*((vSearch + [0,1]*LC('+-')) | signV | vSearch | Any())))
+    expr0.expr = [0,1]*signV + [0,None]*((vSearch + [0,1]*LC('+-')) | signV | vSearch | Any())
+    r.append(expr0.expr)
     
     # multiply, divide
-    vSearch = NM('v', Search(M('0')))
-    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('*/%') + vSearch)) | vSearch)))
+    expr0 = Holder()
+    vSearch = NM('v', Search(expr0))
+    expr0.expr = BtN('v', vSearch + [1,None]*(LC('*/%') + vSearch)) | vSearch
+    r.append(Search(expr0.expr))
 
     # add, sub
-    vSearch = NM('v', Search(M('0')))
-    r.append(Search(to_recursive(BtN('v', vSearch + [1,None]*(LC('+-') + vSearch)) | vSearch)))
+    expr0 = Holder()
+    vSearch = NM('v', Search(expr0))
+    expr0.expr = BtN('v', vSearch + [1,None]*(LC('+-') + vSearch)) | vSearch
+    r.append(Search(expr0.expr))
     
     return r
 

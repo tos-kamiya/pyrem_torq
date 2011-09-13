@@ -1,5 +1,3 @@
-from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
-
 from base_expression import *
 from literal_expression import Literal, LiteralClass
 from node_expression import Node, NodeClass
@@ -29,7 +27,7 @@ class Require(TorqExpressionWithExpr):
         return self.expr.required_node_literal_epsilon()
             
     def seq_merged(self, other):
-        if isinstance(self.expr, ( Literal, LiteralClass, Node, NodeClass )):
+        if self.expr.__class__ is Literal or self.expr.__class__ is LiteralClass or self.expr.__class__ is Node or self.expr.__class__ is NodeClass:
             rs = self.required_node_literal_epsilon()
             ro = other.required_node_literal_epsilon()
             if rs is None or ro is None: return None
@@ -43,11 +41,10 @@ class Require(TorqExpressionWithExpr):
                 # so self will not do filter out other than other does.
                 return other
         
-    @staticmethod
-    def build(expr): 
-        if isinstance(expr, ( Never, Epsilon )):
-            return expr
-        return Require(expr)
+    def optimized(self, objectpool={}):
+        if self.expr.__class__ is Never or self.expr.__class__ is Epsilon:
+            return self.expr.optimized(objectpool)
+        return self
 
 class RequireBut(TorqExpressionWithExpr):
     ''' Require expression matches to a sequence which the internal expression DOES NOT matches.
@@ -69,23 +66,21 @@ class RequireBut(TorqExpressionWithExpr):
         if self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) is None: return _zeroLengthReturnValue
     
     def seq_merged(self, right):
-        if isinstance(right, Any):
-            return AnyBut.build(self.expr) 
+        if right.__class__ is Any:
+            return AnyBut(self.expr) 
 
-    @staticmethod
-    def build(expr): 
-        if isinstance(expr, Epsilon):
-            return Never()
-        elif isinstance(expr, Never):
-            return Epsilon()
-        return RequireBut(expr)
-
-class EndOfNode(TorqExpression): # singleton
+    def optimized(self, objectpool={}):
+        if self.expr.__class__ is Never:
+            return Epsilon().optimized(objectpool)
+        elif self.expr.__class__ is Epsilon:
+            return Never().optimized(objectpool)
+        return self
+    
+class EndOfNode(TorqExpressionSingleton):
     ''' EndOfNode expression matches to a position of end-of-sequence.
        When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
     '''
     
-    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_eon(self, inpSeq, curInpPos, lookAheadDummy): return _zeroLengthReturnValue
@@ -93,15 +88,11 @@ class EndOfNode(TorqExpression): # singleton
     def required_node_literal_epsilon(self):
         return (), (), True
             
-    @staticmethod
-    def build(): return EndOfNode()
-
-class BeginOfNode(TorqExpression): # singleton
+class BeginOfNode(TorqExpressionSingleton):
     ''' BeginOfNode expression matches to a position of beginning-of-sequence.
        When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
     '''
     
-    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_node(self, inpSeq, inpPos, lookAhead):
@@ -112,10 +103,7 @@ class BeginOfNode(TorqExpression): # singleton
 
     def required_node_literal_epsilon(self):
         return (), (), True
-            
-    @staticmethod
-    def build(): return BeginOfNode()
-
+                    
 class AnyBut(TorqExpressionWithExpr):
     ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()).
     '''
@@ -133,11 +121,10 @@ class AnyBut(TorqExpressionWithExpr):
         if self._expr._match_lit(inpSeq, inpPos, lookAheadString) is None: 
             return 1, ( lookAheadString, ), ()
         
-    @staticmethod
-    def build(expr): 
-        if isinstance(expr, ( Epsilon, Any )):
-            return Never()
-        elif isinstance(expr, Never):
-            return Any()
-        return AnyBut(expr)
+    def optimized(self, objectpool={}):
+        if self.expr.__class__ is Never:
+            return Any().optimized(objectpool)
+        elif self.expr.__class__ is Epsilon or self.expr.__class__ is Any:
+            return Never().optimized(objectpool)
+        return self
     

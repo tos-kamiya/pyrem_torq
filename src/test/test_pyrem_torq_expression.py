@@ -169,21 +169,29 @@ class TestTorqExpression(unittest.TestCase):
         expr1 = Epsilon()
         expr2 = Literal("fuga")
         expr1_2 = expr1 + expr2
+        self.assertNotEqual(expr1_2, Literal("fuga"))
+        expr1_2 = expr1_2.optimized()
         self.assertEqual(expr1_2, Literal("fuga"))
     
     def testSelection(self):
         expr1 = LiteralClass(("u", "p"))
         expr2 = LiteralClass(("d", "o", "w", "n"))
         expr1_2 = expr1 | expr2
+        self.assertNotEqual(expr1_2, LiteralClass(("u", "p", "d", "o", "w", "n")))
+        expr1_2 = expr1_2.optimized()
         self.assertEqual(expr1_2, LiteralClass(("u", "p", "d", "o", "w", "n")))
         
     def testConcatLiteal(self):
         expr1 = Literal("a")
         expr2 = Literal("b")
         expr1or2 = expr1 | expr2
+        self.assertNotEqual(expr1or2, LiteralClass([ "a", "b" ]))
+        expr1or2 = expr1or2.optimized()
         self.assertEqual(expr1or2, LiteralClass([ "a", "b" ]))
         
         expr1plus2 = expr1 + expr2
+        self.assertNotEqual(expr1plus2, Seq(Literal("a"), Literal("b")))
+        expr1plus2 = expr1plus2.optimized()
         self.assertEqual(expr1plus2, Seq(Literal("a"), Literal("b")))
         
     def testIdentifier(self):
@@ -291,9 +299,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ ])
     
     def testRemoveRedundantParen(self):
-        expr0 = Marker('0')
+        expr0 = Holder()
         expr0.expr = Or(Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
-            NodeMatch("expr", Search(Marker('0'))),
+            NodeMatch("expr", Search(expr0)),
             Any())
         expr = Search(expr0)
         
@@ -309,6 +317,26 @@ class TestTorqExpression(unittest.TestCase):
         outSeq = [ seq[0] ] + outSeq
         self.assertEqual(outSeq, [ 'code', [ 'literal', 'a' ] ])
 
+    def testOptimizationThroughHolder(self):
+        expr2 = Holder()
+        expr1 = Literal("a")
+        expr2.expr = expr1
+        self.assertNotEqual(expr2, Literal("a"))
+        expr2 = expr2.optimized()
+        self.assertEqual(expr2, Literal("a"))
+        
+    def testOptimizationOfRecursiveExpression(self):
+        expr2 = Holder()
+        expr1 = Literal("a")
+        expr2.expr = Or(Epsilon(), expr1)
+        optimizedExpr2 = expr2.optimized()
+        self.assertEqual(optimizedExpr2, Epsilon())
+        
+        expr3 = Holder()
+        expr3.expr = Or(expr1, Epsilon())
+        optimizedExpr3 = expr3.optimized()
+        self.assertEqual(optimizedExpr3, expr3.expr)
+        
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)
 

@@ -28,17 +28,17 @@ class CompileError(StandardError):
         self.referenceNode = referenceNode
 
 def parse_to_ast(inputSeq, verboseOutput=None):
-    A = _pte.Any.build
-    AN = _pte.AnyNode.build
-    BtN = _pte.BuildToNode.build
+    A = _pte.Any
+    AN = _pte.AnyNode
+    BtN = _pte.BuildToNode
     IN = _pte.InsertNode
-    L = _pte.Literal.build
-    LC = _pte.LiteralClass.build
-    M = _pte.Marker.build
-    N = _pte.Node.build
-    NM = _pte.NodeMatch.build
-    R = _pte.Rex.build
-    XtA = _pte.AnyBut.build
+    L = _pte.Literal
+    LC = _pte.LiteralClass
+    N = _pte.Node
+    NM = _pte.NodeMatch
+    R = _pte.Rex
+    XtA = _pte.AnyBut
+    Holder = _pte.Holder
      
     seq = []
     if verboseOutput:
@@ -64,7 +64,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 e = L(strings[0])
                 for s in strings[1:]: e = e + L(s)
                 return BtN(label, e)
-            tokenExpr = _pte.Or.build(
+            tokenExpr = _pte.Or(
                 # spaces/comments
                 _pte.Drop(BtN("space", [1,]*R(r"^\s$"))),
                 _pte.Drop(BtN("comment", L('#') + [0,]*XtA(LC(["\n", "\r", "\r\n"])))),
@@ -107,7 +107,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     with verbose_print_step_title_and_result_seq('preChecking'):
         def parsePreCheckingExpr():
             idOrStr = N('id') | N('string_literal')
-            preCheckExpr = _pte.Or.build(
+            preCheckExpr = _pte.Or(
                 idOrStr + idOrStr + _pte.ErrorExpr("expected ',' between two ids/string literals"),
                 N('RP') + idOrStr + _pte.ErrorExpr("expected ',' after paren"),
                 idOrStr + N('LP') + _pte.ErrorExpr("expected ',' before paren (or misspelled built-in operator?)"),
@@ -120,20 +120,20 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     
     with verbose_print_step_title_and_result_seq('parseParen'):
         def parseParenExpr():
-            ed = _pte.ExprDict()
-            parenExpr = ed["parenExpr"] = XtA((N('LP') | N('RP'))) \
+            parenExpr = Holder('parenExpr')
+            parenExpr.expr = XtA((N('LP') | N('RP'))) \
                 | BtN('apply', IN('insert_subtree') + _pte.Drop(N('LP')) + (N('id') | N('null')) + _pte.Drop(N('insert_subtree')) + _pte.Drop(N('RP'))) \
-                | BtN('param',  _pte.Drop(N('LP')) + [0,]*M("parenExpr") + _pte.Drop(N('RP')))
-            return __fill(parenExpr, "Can't parse parens")
+                | BtN('param',  _pte.Drop(N('LP')) + [0,]*parenExpr + _pte.Drop(N('RP')))
+            return __fill(parenExpr.expr, "Can't parse parens")
         seq[:] = parseParenExpr().parse(seq)
     
     def recurseApplyAndParam(marker): return NM('apply', A() + [0,]*marker) | NM('param', [0,]*marker)
     
     with verbose_print_step_title_and_result_seq('parseParen'):
         def parseUnaryOperatorsExpr():
-            ed = _pte.ExprDict()
-            unaryOperatorExpr = ed["unaryOperatorExpr"] = _pte.Or.build(recurseApplyAndParam(M("unaryOperatorExpr")),
-                BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('reqbut') | N('req') | N('anybut')) + M("unaryOperatorExpr")),
+            unaryOperatorExpr = Holder('unaryOperatorExpr')
+            unaryOperatorExpr.expr = _pte.Or(recurseApplyAndParam(unaryOperatorExpr),
+                BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('reqbut') | N('req') | N('anybut')) + unaryOperatorExpr),
                 BtN('error', _pte.Drop(N('error')) + N('string_literal', newLabel=_pte.FLATTEN)),
                 BtN('error', _pte.Drop(N('error')) + \
                     NM('param', N('string_literal', newLabel=_pte.FLATTEN), newLabel=_pte.FLATTEN)),
@@ -141,49 +141,49 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 BtN('apply', IN("expand") + _pte.Drop(N('diamond')) + N('id')),
                 N('diamond') + _pte.ErrorExpr('operator <> only applicable to a node'),
                 A())
-            return _pte.Search(unaryOperatorExpr)
+            return _pte.Search(unaryOperatorExpr.expr)
         seq[:] = parseUnaryOperatorsExpr().parse(seq)
     
     with verbose_print_step_title_and_result_seq('parseBinaryOperatorSeq'):
         def parseBinaryOperatorSeqExpr():
-            ed = _pte.ExprDict()
-            term = ed["term"] = recurseApplyAndParam(M("seqExpr")) | XtA(N('comma'))
-            seqExpr = ed["seqExpr"] = BtN('apply', IN('seq') + term + [1,]*(_pte.Drop(N('comma')) + term)) \
+            seqExpr = Holder('seqExpr')
+            term = recurseApplyAndParam(seqExpr) | XtA(N('comma'))
+            seqExpr.expr = BtN('apply', IN('seq') + term + [1,]*(_pte.Drop(N('comma')) + term)) \
                 | term
             return __fill(seqExpr, "Can't parse binary operator Seq (,)")
         seq[:] = parseBinaryOperatorSeqExpr().parse(seq)
     
     with verbose_print_step_title_and_result_seq('parseBinaryOperatorOr'):
         def parseBinaryOperatorOrExpr():
-            ed = _pte.ExprDict()
-            term = ed["term"] = recurseApplyAndParam(M("orExpr")) | XtA(N('or'))
-            orExpr = ed["orExpr"] = BtN('apply', 
+            orExpr = Holder('orExpr')
+            term = recurseApplyAndParam(orExpr) | XtA(N('or'))
+            orExpr.expr = BtN('apply', 
                 IN('or') + term + [1,]*(_pte.Drop(N('or')) + term)) \
                 | term
-            return __fill(orExpr, "Can't parse binary operator Or (|)")
+            return __fill(orExpr.expr, "Can't parse binary operator Or (|)")
         seq[:] = parseBinaryOperatorOrExpr().parse(seq)
     
     with verbose_print_step_title_and_result_seq('parseBinaryOperatorMatch'):
         def parseBinaryOperatorMatchExpr():
-            ed = _pte.ExprDict()
-            def aop(opName): return BtN('apply', IN(opName) + N('id') + _pte.Drop(N(opName)) + M("matchExpr"))
-            def aopwd(opName): return BtN('apply', IN(opName) + IN('expand') + _pte.Drop(N('diamond')) + N('id') + _pte.Drop(N(opName)) + M("matchExpr"))
-            term = ed["term"] = recurseApplyAndParam(M("matchExpr")) | XtA((N('matches') | N('assign_subtree')))
-            matchExpr = ed["matchExpr"] = aopwd('matches') | \
-                BtN('apply', IN('matches') + N('id') + _pte.Drop(N('matches')) + M("matchExpr")) | \
-                BtN('apply', IN('insert_subtree') + (N('id') | N('null')) + _pte.Drop(N('insert_subtree')) + M("matchExpr")) | \
+            matchExpr = Holder('matchExpr')
+            def aop(opName): return BtN('apply', IN(opName) + N('id') + _pte.Drop(N(opName)) + matchExpr)
+            def aopwd(opName): return BtN('apply', IN(opName) + IN('expand') + _pte.Drop(N('diamond')) + N('id') + _pte.Drop(N(opName)) + matchExpr)
+            term = recurseApplyAndParam(matchExpr) | XtA((N('matches') | N('assign_subtree')))
+            matchExpr.expr = aopwd('matches') | \
+                BtN('apply', IN('matches') + N('id') + _pte.Drop(N('matches')) + matchExpr) | \
+                BtN('apply', IN('insert_subtree') + (N('id') | N('null')) + _pte.Drop(N('insert_subtree')) + matchExpr) | \
                 term
-            return __fill(matchExpr, "Can't parse binary operator match (::)")
+            return __fill(matchExpr.expr, "Can't parse binary operator match (::)")
         seq[:] = parseBinaryOperatorMatchExpr().parse(seq)
         
     with verbose_print_step_title_and_result_seq('parseReduceRedundantParen'):
         def parseReduceRedundantParenExpr():
-            ed = _pte.ExprDict()
-            term = ed["term"] = NM('apply', A() + [0,]*M("paramExpr")) | XtA(N('param'))
-            paramExpr = ed["paramExpr"] = NM('param', M("paramExpr"), newLabel=_pte.FLATTEN) \
+            paramExpr = Holder('paramExpr')
+            term = NM('apply', A() + [0,]*paramExpr) | XtA(N('param'))
+            paramExpr.expr = NM('param', paramExpr, newLabel=_pte.FLATTEN) \
                 | NM('param', AN()) \
                 | term
-            return __fill(paramExpr, "Can't parse redundant paren")
+            return __fill(paramExpr.expr, "Can't parse redundant paren")
         seq[:] = parseReduceRedundantParenExpr().parse(seq)
     
     with verbose_print_step_title_and_result_seq('parseStatement'):
@@ -282,7 +282,7 @@ def convert_literal_to_expression_object(s):
 def _nodeNameIn(seq, names): 
     return len(seq) >= 1 and seq[0] in names
     
-def cnv_i(seq, replaceTable, literalExprPool):
+def _cnv_i(seq, replaceTable, literalExprPool):
     def _marker2Label(seq):
         assert seq[0] == 'marker'
         assert len(seq) >= 2
@@ -303,9 +303,9 @@ def cnv_i(seq, replaceTable, literalExprPool):
         return "".join(s)
     
     _nameToRep = { 'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore }
-    _nameToOrSeq = { 'or': _pte.Or.build, 'seq': _pte.Seq.build }
+    _nameToOrSeq = { 'or': _pte.Or, 'seq': _pte.Seq }
     #_nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
-    _nameToBuiltinFunc = { 'req': _pte.Require.build, 'reqbut': _pte.RequireBut.build, 'anybut': _pte.AnyBut.build, 'search' : _pte.Search.build }
+    _nameToBuiltinFunc = { 'req': _pte.Require, 'reqbut': _pte.RequireBut, 'anybut': _pte.AnyBut, 'search' : _pte.Search }
     
     len_seq = len(seq)
     
@@ -322,7 +322,7 @@ def cnv_i(seq, replaceTable, literalExprPool):
             if len_seq != 4: raise CompileError("Invalid NodeMatch(::) expr", seq1)
             label = _id2Label(seq[2])
             if not label: raise CompileError("Operator NodeMatch(::) requires an identifier", seq[2])
-            return _pte.NodeMatch(label, cnv_i(seq[3], replaceTable, literalExprPool), newLabel=(_pte.FLATTEN if is_flatten else None))
+            return _pte.NodeMatch(label, _cnv_i(seq[3], replaceTable, literalExprPool), newLabel=(_pte.FLATTEN if is_flatten else None))
         elif seq1NodeName == 'insert_subtree':
             if len_seq == 3:
                 if seq[2][0] == 'null': raise CompileError("Invalid form. '(null <- )' is not permitted")
@@ -332,11 +332,11 @@ def cnv_i(seq, replaceTable, literalExprPool):
             else:
                 if len_seq != 4: raise CompileError("Invalid InsertNode(<-)", seq1)
                 if seq[2][0] == 'null':
-                    return _pte.Drop(cnv_i(seq[3], replaceTable, literalExprPool))
+                    return _pte.Drop(_cnv_i(seq[3], replaceTable, literalExprPool))
                 else:
                     label = _id2Label(seq[2])
                     if not label: raise CompileError("InsertNode(<-) requires an identifier", seq[2])
-                    return _pte.BuildToNode(label, cnv_i(seq[3], replaceTable, literalExprPool))
+                    return _pte.BuildToNode(label, _cnv_i(seq[3], replaceTable, literalExprPool))
         elif seq1NodeName == 'insert':
             if len_seq != 3: raise CompileError("Invalid insert expr", seq1)
             label = _id2Label(seq[2])
@@ -349,15 +349,15 @@ def cnv_i(seq, replaceTable, literalExprPool):
             return _pte.Node(label, newLabel=_pte.FLATTEN)
         elif seq1NodeName in _nameToBuiltinFunc:
             if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
-            r = cnv_i(seq[2], replaceTable, literalExprPool)
+            r = _cnv_i(seq[2], replaceTable, literalExprPool)
             return _nameToBuiltinFunc[seq1[0]](r)
         elif seq1NodeName in _nameToRep:
             if len_seq != 3: raise CompileError("Invalid Repeat expr", seq1)
-            r = cnv_i(seq[2], replaceTable, literalExprPool)
+            r = _cnv_i(seq[2], replaceTable, literalExprPool)
             return _nameToRep[seq1[0]](r)
         elif seq1NodeName in _nameToOrSeq:
             if not(len_seq >= 2): raise CompileError("Invalid Or(|)/Seq(,) expr", seq1)
-            r = [ cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
+            r = [ _cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
             return _nameToOrSeq[seq1[0]](*r)
         else:
             assert False
@@ -374,10 +374,10 @@ def cnv_i(seq, replaceTable, literalExprPool):
     elif seq0 == 'marker':
         label = _marker2Label(seq)
         if not label: raise CompileError("Invalid Marker", seq0)
-        r = replaceTable.get(label)
-        if r is not None:
-            return r
-        return _pte.Marker(label)
+        try:
+            return replaceTable[label]
+        except KeyError, e:
+            raise e
     elif seq0 == 'error':
         if not(len_seq >= 2): raise CompileError("Empty error message", seq0)
         s = "".join(seq[1:])
@@ -412,7 +412,7 @@ def convert_to_expression_object(seq, replaces=None):
         raise ValueError("replaces must not include an item with key '0'")
     for label, expr in replaceTable.iteritems():
         assert isinstance(expr, _pte.TorqExpression)
-    expr0 = _pte.Marker('0') # prepare expr0 for an entry point of recursion
+    expr0 = _pte.Holder() # prepare expr0 for an entry point of recursion
     replaceTable['0'] = expr0
         
     assert len(seq) >= 1 and seq[0] == 'code'
@@ -434,7 +434,7 @@ def convert_to_expression_object(seq, replaces=None):
         if not _nodeNameIn(statementSeq[2], ( 'semicolon' )):
             raise CompileError("Invalid Statement", statementSeq)
         literalExprPool = {}
-        expr = cnv_i(statementSeq[1], replaceTable, literalExprPool)
+        expr = _cnv_i(statementSeq[1], replaceTable, literalExprPool)
         
         expr0.expr = expr # set up the recursion
         return expr

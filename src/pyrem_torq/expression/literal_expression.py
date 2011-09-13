@@ -1,7 +1,7 @@
 import re
 
-from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
-from base_expression import TorqExpression
+#from pyrem_torq.utility import SingletonWoInitArgs as _SingletonWoInitArgs
+from base_expression import TorqExpression, TorqExpressionSingleton
 
 class Literal(TorqExpression):
     ''' Literal expression matches a sequence of characters, which is the same to the internal string. 
@@ -17,7 +17,6 @@ class Literal(TorqExpression):
             return 1, ( lookAheadString, ), ()
         #return None
     
-    def __eq__(self, right): return isinstance(right, Literal) and self.__string == right.__string
     def __repr__(self): return "Literal(%s)" % repr(self.__string)
     def __hash__(self): return hash("Literal") + hash(self.__string)
     
@@ -27,35 +26,38 @@ class Literal(TorqExpression):
     def required_node_literal_epsilon(self):
         return (), ( self.__string, ), False
             
-    @staticmethod
-    def build(s): return Literal(s)
-
     def or_merged(self, other):
-        if isinstance(other, AnyLiteral):
+        if other.__class__ is AnyLiteral:
             return other
-        if isinstance(other, ( Literal, LiteralClass )):
+        if other.__class__ is Literal or other.__class__ is LiteralClass:
             return LiteralClass.merged([ self, other ])
         return None
+    
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
 
-class AnyLiteral(TorqExpression): # singleton
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Literal and self.__string == right.__string
+                
+class AnyLiteral(TorqExpressionSingleton):
     ''' AnyLiteral expression matches a length-1 sequence of character. 
     '''
     
-    __metaclass__ = _SingletonWoInitArgs
     __slots__ = [ ]
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         return 1, ( lookAheadString, ), ()
     
-    def __eq__(self, right): return isinstance(right, AnyLiteral)
     def __repr__(self): return "AnyLiteral()"
     def __hash__(self): return hash("AnyLiteral")
     
-    @staticmethod
-    def build(): return AnyLiteral()
-
     def or_merged(self, other):
-        if isinstance(other, ( Literal, LiteralClass, AnyLiteral )):
+        if other.__class__ is Literal or other.__class__ is LiteralClass or other.__class__ is AnyLiteral:
             return self
         return None
 
@@ -75,9 +77,11 @@ class LiteralClass(TorqExpression):
             return 1, ( lookAheadString, ), ()
         #return None
     
-    def __eq__(self, right): return isinstance(right, LiteralClass) and self.__strings == right.__strings
     def __repr__(self): return "LiteralClass([%s])" % (",".join(repr(s) for s in self.__strings))
     def __hash__(self): return hash("LiteralClass") + sum(map(hash, self.__strings))
+
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is LiteralClass and self.__strings == right.__strings
     
     def extract_strings(self):
         return sorted(self.__strings)
@@ -86,9 +90,9 @@ class LiteralClass(TorqExpression):
         return (), tuple(sorted(self.__strings)), False
             
     def or_merged(self, other):
-        if isinstance(other, AnyLiteral):
+        if other.__class__ is AnyLiteral:
             return other
-        if isinstance(other, ( Literal, LiteralClass )):
+        if other.__class__ is Literal or other.__class__ is LiteralClass:
             return LiteralClass.merged([ self, other ])
         return None
     
@@ -96,13 +100,18 @@ class LiteralClass(TorqExpression):
     def merged(literalExprOrliteralClassExprs):
         mergedStrings = []
         for item in literalExprOrliteralClassExprs:
-            assert isinstance(item, ( Literal, LiteralClass ))
+            assert item.__class__ is Literal or item.__class__ is LiteralClass
             mergedStrings.extend(item.extract_strings())
         return LiteralClass(mergedStrings)
 
-    @staticmethod
-    def build(strings): return LiteralClass(strings)
-
+    def optimized(self, objectpool={}):
+        h = hash(self)
+        for e in objectpool.get(h, []):
+            if e == self:
+                return e
+        objectpool.setdefault(h, []).append(self)
+        return self
+    
 class RexCompilationUnable(ValueError):
     pass
 
@@ -128,11 +137,10 @@ class Rex(TorqExpression):
             return 1, ( lookAheadString, ), ()
         #return None
     
-    def __eq__(self, right): return isinstance(right, Rex) and \
-        self.__expressionstr == right.__expressionstr and self.__ignoreCase == right.__ignoreCase
-    
     def __repr__(self): return "Rex(%s,ignoreCase=%s)" % ( repr(self.__expressionstr), repr(self.__ignoreCase) ) 
     def __hash__(self): return hash("Rex") + hash(self.__expressionstr)
     
-    @staticmethod
-    def build(exprStr, ignoreCase=False): return Rex(exprStr, ignoreCase)
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Rex and \
+                self.__expressionstr == right.__expressionstr and self.__ignoreCase == right.__ignoreCase
+    

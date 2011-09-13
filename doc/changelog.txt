@@ -4,9 +4,19 @@ Pyremics Torq changelog
 Known Bugs
   - None.
 
-0.4 2011/09/09
+0.4 2011/09/13
   - Dropped pyrem_torq.expression_shortname.
   - Renamed some classes: Req -> Require, Xcp -> RequireBut, XcpThenAny -> AnyBut.
+  - Renamed Marker -> Holder. Its constructor now doesn't require the name.
+  - Dropped ExprDict.
+  - Specification change: a function pyrem_torq.script.compile() now requires all 
+    replacements "filled" with argument replaces. For each "@name" in parameter src, 
+    replaces["name"] must returns a valid TorqExpression object. Otherwise, the 
+    function raise a KeyError.
+  - Dropped a method build() from TorqExpression and its descendant classes. 
+    (The build() methods did two jobs, factory and optimizer, so confusing as API.)
+  - Added a method optimized() to TorqExpression and its descendant classes. 
+    (optimized() methods have been split from the old build() methods.)
 
 0.3 2010/03/11
   - Changed module name from pytorqy to pyrem_torq.
