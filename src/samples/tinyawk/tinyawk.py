@@ -13,15 +13,15 @@ from pyrem_torq import *
 from pyrem_torq.expression import *
 
 def split_to_str(text):
-    p = "|".join([
+    p = re.compile("|".join([
         r"/[^/\r\n]*/", r'"[^"\r\n]*"', r"\d+", # literals (regex, string, integer)
         r"#[^\r\n]*", # comment
         r"[ \t]+", r"\r\n|\r|\n", # white spaces, newline
         r"[a-zA-Z_](\w|_)*", # identifier
         r"[<>!=]=|&&|[|][|]", r"[-+*/%<>!=()${},;]|\[|\]", # operators
         r"." # invalid chars
-    ])
-    return [ 'code' ] + [m.group() for m in re.finditer(p, text)]
+    ]))
+    return [ 'code' ] + utility.split_to_strings(text, pattern=p)
 
 def tokenizing_expr_iter():
     # identify reserved words, literals, identifiers
@@ -355,15 +355,15 @@ def main(debugTrace=False):
     des.extend(expr_parsing_expr_iter())
     for desc, expr in des:
         if debugWrite:
-            debugWrite("\n".join(treeseq.seq_pretty(seq)) + "\n") # prints a seq
+            debugWrite("\n".join(treeseq.seq_pretty(treeseq.seq_remove_strattrs(seq))) + "\n") # prints a seq
             debugWrite("step: %s\n" % desc)
-        try:
             newSeq = expr.parse(seq)
-        except InterpretError, e: print repr(e); raise e
         if newSeq is None: raise SystemError("parse error")
         seq = newSeq
-    if debugWrite: debugWrite("\n".join(treeseq.seq_pretty(seq)) + "\n") # prints a seq
-
+    if debugWrite: debugWrite("\n".join(treeseq.seq_pretty(treeseq.seq_remove_strattrs(seq))) + "\n") # prints a seq
+    
+    seq = treeseq.seq_remove_strattrs(seq)
+    
     # interpretation
     interp = StmtInterpreter(seq)
     def dbgwrite(): 

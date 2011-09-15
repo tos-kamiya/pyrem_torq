@@ -118,8 +118,9 @@ class AnyBut(TorqExpressionWithExpr):
             return 1, ( lookAheadNode, ), ()
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
+        assert len(lookAheadString) == 2
         if self._expr._match_lit(inpSeq, inpPos, lookAheadString) is None: 
-            return 1, ( lookAheadString, ), ()
+            return 2, lookAheadString, ()
         
     def optimized(self, objectpool={}):
         if self.expr.__class__ is Never:

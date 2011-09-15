@@ -8,7 +8,12 @@ LC = LiteralClass
 NM = NodeMatch
 
 def tokenize(text):
-    return [ 'code' ] + [m.group() for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text)]
+    seq = [ 'code' ]
+    for m in re.finditer(r"(\d|[.])+|[-+*/%()]", text):
+        b, e = m.span()
+        seq.append(b)
+        seq.append(text[b:e])
+    return seq
 
 def _build_parsing_exprs():    
     r = []
@@ -77,14 +82,15 @@ usage: calculator <expr>
 """[1:-1])
         sys.exit(0)
     
+    ts = pyrem_torq.treeseq
     text = " ".join(sys.argv[1:])
     seq = tokenize(text)
     for expr in parsing_exprs:
-        for L in pyrem_torq.treeseq.seq_pretty(seq): print L # prints an seq
+        for L in ts.seq_pretty(ts.seq_remove_strattrs(seq)): print L # prints an seq
         newSeq = expr.parse(seq)
         if newSeq is None: raise SystemError
         seq = newSeq
-    for L in pyrem_torq.treeseq.seq_pretty(seq): print L # prints an seq
-    result = interpret(seq)
+    for L in ts.seq_pretty(ts.seq_remove_strattrs(seq)): print L # prints an seq
+    result = interpret(ts.seq_remove_strattrs(seq))
     print result
     

@@ -5,7 +5,7 @@ import string
 
 import pyrem_torq.expression as _pte
 from pyrem_torq.treeseq import seq_pretty
-from pyrem_torq.utility import split_to_strings_iter
+from pyrem_torq.utility import split_to_strings
 
 # Priority of operators
 # ()
@@ -54,7 +54,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
             yield
     
     with verbose_print_step_title_and_result_seq('input'):
-        s = [ 'code' ]; s.extend(split_to_strings_iter(inputSeq))
+        s = [ 'code' ] + split_to_strings(inputSeq)
         seq[:] = s
     
     with verbose_print_step_title_and_result_seq('ParseToken'):
@@ -288,15 +288,15 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         assert len(seq) >= 2
         if len(seq) == 2 and seq[1] in ("req", "reqbut", 'null', 'any', 'any_node', 'error'):
             return None
-        return "".join(seq[1:])
+        return "".join(seq[2::2])
         
     _alpha_Set = frozenset(list(string.ascii_letters) + [ '_' ])
     _alnum_Set = frozenset(list(string.ascii_letters) + [ '_' ] + list(string.digits))
     
     def _id2Label(seq):
-        if not(len(seq) >= 2): return None
+        if not(len(seq) >= 3): return None
         if seq[0] != 'id': return None
-        s = seq[1:]
+        s = seq[2::2]
         if s[0][0] not in _alpha_Set: return None
         for ss in s[1:]:
             if ss[0] not in _alnum_Set: return None
@@ -362,10 +362,10 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         else:
             assert False
     elif seq0 == "any":
-        assert len_seq == 2
+        assert len_seq == 3
         return _pte.Any()
     elif seq0 == "any_node":
-        assert len_seq == 2
+        assert len_seq == 3
         return _pte.AnyNode()
     elif seq0 == 'id':
         label = _id2Label(seq)
@@ -379,12 +379,12 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         except KeyError, e:
             raise e
     elif seq0 == 'error':
-        if not(len_seq >= 2): raise CompileError("Empty error message", seq0)
-        s = "".join(seq[1:])
+        if not(len_seq >= 3): raise CompileError("Empty error message", seq0)
+        s = "".join(seq[2::2])
         return _pte.ErrorExpr(__unescape(s))
     elif seq0 == 'string_literal':
-        if not(len_seq >= 2): raise CompileError("Empty Literal", seq0)
-        s = "".join(seq[1:])
+        if not(len_seq >= 3): raise CompileError("Empty Literal", seq0)
+        s = "".join(seq[2::2])
         pooledExpr = literalExprPool.get(s)
         if not pooledExpr:
             try:

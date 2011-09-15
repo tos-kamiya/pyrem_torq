@@ -106,7 +106,7 @@ class TestTorqComile(unittest.TestCase):
             self.assertEquals(e, None)
 
     def test19th(self):
-        self.assertRaises(pyrem_torq.script.CompileError, compiling, "@undefined_label;")
+        self.assertRaises(KeyError, compiling, "@undefined_label;")
 
 if __name__ == '__main__':
     unittest.main()

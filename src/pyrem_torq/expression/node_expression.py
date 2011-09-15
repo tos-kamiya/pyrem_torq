@@ -150,7 +150,11 @@ class NodeMatch(TorqExpressionWithExpr):
                 r = self._expr._match_eon(lookAheadNode, 1, None)
             else:
                 lah = lookAheadNode[1]
-                r = (self._expr._match_node if isinstance(lah, list) else self._expr._match_lit)(lookAheadNode, 1, lah)
+                if lah.__class__ is list:
+                    r = self._expr._match_node(lookAheadNode, 1, lah)
+                else:
+                    #assert lah.__class__ is int #debug
+                    r = self._expr._match_lit(lookAheadNode, 1, ( lah, lookAheadNode[2] ))
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
@@ -209,7 +213,11 @@ class AnyNodeMatch(TorqExpressionWithExpr):
                 r = self._expr._match_eon(lookAheadNode, 1, None)
             else:
                 lah = lookAheadNode[1]
-                r = (self._expr._match_node if isinstance(lah, list) else self._expr._match_lit)(lookAheadNode, 1, lah)
+                if lah.__class__ is list:
+                    r = self._expr._match_node(lookAheadNode, 1, lah)
+                else:
+                    #assert lah.__class__ is int #debug
+                    r = self._expr._match_lit(lookAheadNode, 1, ( lah, lookAheadNode[2] ))
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
@@ -430,7 +438,7 @@ class Drop(TorqExpressionWithExpr):
         p, o, d = r
         if not d: return p, (), o
         if not o: return p, (), d
-        dropSeq = d if isinstance(d, list) else list(d)
+        dropSeq = d if d.__class__ is list else list(d)
         dropSeq.extend(o)
         return p, (), dropSeq
     

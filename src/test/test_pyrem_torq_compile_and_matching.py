@@ -1,6 +1,6 @@
 import sys, re
 
-from pyrem_torq.utility import split_to_strings_iter
+from pyrem_torq.utility import split_to_strings
 import pyrem_torq.expression
 import pyrem_torq.script
 import pyrem_torq.treeseq
@@ -35,7 +35,7 @@ class TestTorqComileAndInterpret(unittest.TestCase):
                 ]
         exprs = compile_exprs(exprStrs)
         
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter("+1.0 + 2 * ((3 - 4) / -.5) ** 6"))
+        seq = [ 'code' ] + split_to_strings("+1.0 + 2 * ((3 - 4) / -.5) ** 6")
         for exprIndex, expr in enumerate(exprs):
             print "exprIndex=", exprIndex, "cur seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
             newSeq = expr.parse(seq)
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 }
 """[1:-1]
 
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         for expr in exprs:
             posDelta, outSeq, dropSeq = expr.match(seq, 1)
             self.assertEqual(1 + posDelta, len(seq))
@@ -84,11 +84,11 @@ int main(int argc, char *argv[])
         eolExpr = BtN('eol', L("\r\n") | L("\n") | L("\r"))
         expr = S(eolExpr) + Q(pyrem_torq.expression.EndOfNode()) + IN('eof')
         
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter("abc\n"))
+        seq = [ 'code' ] + split_to_strings("abc\n")
 
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
-        self.assertEqual(1 + posDelta, 3)
-        self.assertEqual(outSeq, [ 'abc', [ 'eol', '\n' ], [ 'eof' ] ])
+        self.assertEqual(1 + posDelta, 5)
+        self.assertEqual(outSeq, [ 0, 'abc', [ 'eol', 3, '\n' ], [ 'eof' ] ])
     
     def test5th(self):
         atoz = 'r"^[a-z]"'
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
         
         inputText = r'if (x and y or z) printf("hello\n");'
         inputText = inputText.decode(sys.getfilesystemencoding())
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         
         for expr in exprs:
             newSeq = expr.parse(seq)
@@ -122,10 +122,10 @@ int main(int argc, char *argv[])
         
         inputText = r'argv[0];'
         inputText = inputText.decode(sys.getfilesystemencoding())
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         
         seq = exprs[0].parse(seq)
-        self.assertEqual(seq[1], [ 'wordlike', u'argv' ])
+        self.assertEqual(seq[1], [ 'wordlike', 0, u'argv' ])
         
         print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
         
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 
         inputText = r'argv[0];'
         inputText = inputText.decode(sys.getfilesystemencoding())
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         
         for expr in exprs:
             newSeq = expr.parse(seq)
@@ -163,12 +163,12 @@ int main(int argc, char *argv[])
         sampleFlotingPointLiterals = [ '0x012abc.def', '0xabc.012', '0xap10' ]
         for inputText in sampleFlotingPointLiterals:
             inputText = inputText.decode(sys.getfilesystemencoding())
-            seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText, pat))
+            seq = [ 'code' ] + split_to_strings(inputText, pat)
             
             seq = exprs[0].parse(seq)
             self.assertEqual(seq[0], 'code')
             self.assertEqual(seq[1][0], 'l_float')
-            self.assertEqual(u"".join(seq[1][1:]), inputText)
+            self.assertEqual(u"".join(seq[1][2::2]), inputText)
         
     def test9th(self):
         exprs = compile_exprs([ r"""
@@ -177,12 +177,12 @@ int main(int argc, char *argv[])
         assert len(exprs) == 1
         
         inputText = r'b,c,d'
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         seq = exprs[0].parse(seq)
-        self.assertEqual(seq, [ 'code', 'b', ',', 'c', ',', 'd' ])
+        self.assertEqual(seq, [ 'code', 0, 'b', 1, ',', 2, 'c', 3, ',', 4, 'd' ])
         
         inputText = r'a,b,c'
-        seq = [ 'code' ]; seq.extend(split_to_strings_iter(inputText))
+        seq = [ 'code' ] + split_to_strings(inputText)
         self.assertRaises(pyrem_torq.expression.InterpretErrorByErrorExpr, exprs[0].parse, seq)
     
 if __name__ == '__main__':

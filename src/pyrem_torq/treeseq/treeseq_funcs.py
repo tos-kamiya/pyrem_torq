@@ -1,4 +1,5 @@
 from itertools import islice
+from collections import deque
 
 def assertion_inpseq_is_empty(inpSeq):
     try: inpSeq.next()
@@ -7,7 +8,7 @@ def assertion_inpseq_is_empty(inpSeq):
 
 def seq_count_leaf_contents(seq):
     def count_i(item):
-        if isinstance(item, list):
+        if item.__class__ is list:
             return sum(map(count_i, islice(item, 1, None)))
         return 1
     return count_i(seq)
@@ -15,7 +16,7 @@ def seq_count_leaf_contents(seq):
 def seq_visit(seq): # yields ( curPos, in_or_out, node (or item) )
     mark_in, mark_out, mark_item = 1, -1, 0
     def seq_visit_i(curPos, item):
-        if not isinstance(item, list):
+        if item.__class__ is not list:
             yield curPos, mark_item, item
         else:
             assert len(item) >= 1
@@ -39,7 +40,7 @@ def seq_walk(seq): # yields ( curPos, nodeName, node (or item) )
 
 def seq_outermost_node_iter(seq, label):
     def soni_i(curPos, item):
-        if isinstance(item, list):
+        if item.__class__ is not list:
             assert len(item) >= 1
             if item[0] == label:
                 yield curPos, item
@@ -76,7 +77,7 @@ def seq_pretty(seq):
         i = 1
         while i < len_seq:
             item = seq[i]
-            if isinstance(item, list):
+            if item.__class__ is list:
                 seq_pretty_i(item, newIndent)
                 i += 1
                 continue # while i
@@ -96,3 +97,42 @@ def seq_pretty(seq):
     seq_pretty_i(seq, "")
     return r
 
+def seq_remove_strattrs(seq):
+    r = []; r_append = r.append
+    q = deque(seq)
+    r_append(q.popleft())
+    while q:
+        item = q.popleft()
+        if item.__class__ is list:
+            r_append(seq_remove_strattrs(item))
+        else:
+            r_append(q.popleft())
+    return r
+            
+def seq_enclose_strattrs(seq):
+    r = []; r_append = r.append
+    q = deque(seq)
+    r_append(q.popleft())
+    while q:
+        item = q.popleft()
+        if item.__class__ is list:
+            r_append(seq_enclose_strattrs(item))
+        else:
+            r_append(( item, q.popleft() ))
+    return r
+
+def seq_disclose_strattrs(seq):
+    r = []; r_append = r.append; r_extend = r.extend
+    q = deque(seq)
+    r_append(q.popleft())
+    while q:
+        item = q.popleft()
+        if item.__class__ is list:
+            r_append(seq_disclose_strattrs(item))
+        elif item.__class__ is tuple:
+            assert len(item) == 2
+            r_extend(item)
+        else:
+            raise TypeError("wrong type item: %s" % repr(item))
+    return r
+    

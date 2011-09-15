@@ -37,16 +37,20 @@ class TorqExpression(object):
         
         assert inpPos >= 1
         len_inpSeq = len(inpSeq)
-        assert isinstance(inpSeq, list) and len_inpSeq >= 1
+        assert inpSeq.__class__ is list and len_inpSeq >= 1
         if inpPos == len_inpSeq:
             r = self._match_eon(inpSeq, inpPos, None)
         else:
             lookAhead = inpSeq[inpPos]
-            r = (self._match_node if isinstance(lookAhead, list) else self._match_lit)(inpSeq, inpPos, lookAhead)
+            if lookAhead.__class__ is list:
+                r = self._match_node(inpSeq, inpPos, lookAhead)
+            else:
+                #assert lookAhead.__class__ is int #debug
+                r = self._match_lit(inpSeq, inpPos, ( lookAhead, inpSeq[inpPos + 1] ))
         if r is None: return 0, [], []
         p, o, d = r
-        if not isinstance(o, list): o = list(o)
-        if not isinstance(d, list): d = list(d)
+        if o.__class__ is not list: o = list(o)
+        if d.__class__ is not list: d = list(d)
         return p, o, d
     
     def parse(self, inpSeq, dropSeq=None):
@@ -194,7 +198,8 @@ class Or(TorqExpression):
         #else: return None
         
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        for expr in self.__ltbl_get(lookAheadString, self.__elst):
+        assert len(lookAheadString) == 2
+        for expr in self.__ltbl_get(lookAheadString[1], self.__elst):
             r = expr._match_lit(inpSeq, inpPos, lookAheadString)
             if r is not None:
                 return r
@@ -268,14 +273,18 @@ class Seq(TorqExpression):
         p, o, d = r
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos + p
-        outSeq = o if isinstance(o, list) else list(o); o_xt = outSeq.extend
-        dropSeq = d if isinstance(d, list) else list(d); d_xt = dropSeq.extend
+        outSeq = o if o.__class__ is list else list(o); o_xt = outSeq.extend
+        dropSeq = d if d.__class__ is list else list(d); d_xt = dropSeq.extend
         for expr in self.__exprs[1:]:
             if curInpPos == len_inpSeq:
                 r = expr._match_eon(inpSeq, curInpPos, None)
             else:
                 lookAhead = inpSeq[curInpPos]
-                r = (expr._match_node if isinstance(lookAhead, list) else expr._match_lit)(inpSeq, curInpPos, lookAhead)
+                if lookAhead.__class__ is list:
+                    r = expr._match_node(inpSeq, curInpPos, lookAhead)
+                else:
+                    #assert lookAhead.__class__ is int #debug
+                    r = expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
             if r is None: return None
             p, o, d = r
             curInpPos += p; o_xt(o); d_xt(d)
@@ -348,7 +357,11 @@ class Repeat(TorqExpressionWithExpr):
         ul -= self.__lowerLimit
         while count < ul and curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
-            r = (self._expr._match_node if isinstance(lookAhead, list) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
+            if lookAhead.__class__ is list:
+                r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
+            else:
+                #assert lookAhead.__class__ is int #debug
+                r = self._expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
             if r is None:
                 if count < 0: return None
                 break # for count
@@ -362,7 +375,7 @@ class Repeat(TorqExpressionWithExpr):
             p, o, d = r
             #assert p == 0
             #assert not d
-            if not isinstance(o, list): o = list(o)
+            if o.__class__ is not list: o = list(o)
             o_xt(o * -count)
         return curInpPos - inpPos, outSeq, dropSeq
     
@@ -376,7 +389,7 @@ class Repeat(TorqExpressionWithExpr):
         #assert p == 0
         #assert not d
         if self.__lowerLimit != 0:
-            if not isinstance(o, list): o = list(o)
+            if o.__class__ is not list: o = list(o)
             return 0, o * self.__lowerLimit, ()
         return _zeroLengthReturnValue
     
@@ -450,13 +463,23 @@ class Search(TorqExpressionWithExpr):
         dropSeq = []; d_xt = dropSeq.extend
         while curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
-            r = (self._expr._match_node if isinstance(lookAhead, list) else self._expr._match_lit)(inpSeq, curInpPos, lookAhead)
+            if lookAhead.__class__ is list:
+                r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
+            else:
+                #assert lookAhead.__class__ is int #debug
+                r = self._expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
             if r is not None:
                 p, o, d = r
                 curInpPos += p; o_xt(o); d_xt(d)
             if r is None or p == 0:
-                curInpPos += 1
-                o_ap(lookAhead)
+                if lookAhead.__class__ is list:
+                    o_ap(lookAhead)
+                    curInpPos += 1
+                else:
+                    #assert lookAhead.__class__ is int #debug
+                    o_ap(lookAhead)
+                    o_ap(inpSeq[curInpPos + 1])
+                    curInpPos += 2
         if curInpPos == len_inpSeq:
             r = self._expr._match_eon(inpSeq, curInpPos, None)
             if r is not None:
@@ -529,7 +552,7 @@ class Any(TorqExpressionSingleton):
     __slots__ = [ ]
 
     def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ], ()
-    _match_lit = _match_node
+    def _match_lit(self, inpSeq, inpPos, lookAheadString): return 2, lookAheadString, ()
     
 class Never(TorqExpressionSingleton):
     ''' Never expression does not match any sequence.
