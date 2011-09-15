@@ -18,6 +18,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'ab' ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testSeq(self):
         expr = Seq(Literal('a'), Literal('b'))
         seq = [ 'text', 0, 'a', 1, 'b' ]
@@ -26,6 +29,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'a', 1, 'b' ])
         self.assertFalse(dropSeq)
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testOr(self):
         expr = Or(Literal('a'), Literal('b'))
         
@@ -35,12 +41,18 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'a' ])
         self.assertFalse(dropSeq)
         
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+       
         seq = [ 'text', 0, 'b' ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(1 + posDelta, len(seq))
         self.assertEqual(outSeq, [ 0, 'b' ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testRepeat(self):
         expr = Repeat(Literal('a'), 3, 3)
         
@@ -49,6 +61,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(1 + posDelta, len(seq))
         self.assertEqual(outSeq, [ 0, 'a', 1, 'a', 2, 'a' ])
         self.assertFalse(dropSeq)
+
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
 
         seq = [ 'text', 0, 'a', 1, 'a' ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
@@ -92,6 +107,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'A', 0, 'a' ] ])
         self.assertFalse(dropSeq)
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testNode(self):
         expr = Node('A')
         seq = [ 'text', [ 'A', 0, 'p', 1, 'a', 2, 'b', 3, 'q' ] ]
@@ -100,6 +118,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(posDelta, 1)
         self.assertEqual(outSeq, [ [ 'A', 0, 'p', 1, 'a', 2, 'b', 3, 'q' ] ])
         self.assertFalse(dropSeq)
+        
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
         
     def testAny(self):
         expr = Any()
@@ -110,6 +131,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'A', 0, 'p', 1, 'a', 2, 'b', 3, 'q' ] ])
         self.assertFalse(dropSeq)
         
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         seq = [ 'text', 0, 'a' ]
         
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
@@ -117,6 +141,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'a' ])
         self.assertFalse(dropSeq)
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testLiteralClass(self):
         expr = LiteralClass(("a", "b", "c"))
         seq = [ 'text', 0, 'a' ]
@@ -126,6 +153,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'a' ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         seq = [ 'text', 0, 'b' ]
         
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
@@ -133,11 +163,17 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'b' ])
         self.assertFalse(dropSeq)
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+
         seq = [ 'text', 0, 'p' ]
         
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 0)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testDrop(self):
         expr = Drop(Node("A"))
         
@@ -146,6 +182,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(posDelta, 1)
         self.assertFalse(outSeq)
         self.assertEqual(dropSeq, [ [ 'A' ] ])
+        
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
         
     def testRex(self):
         expr = Rex(r"^[a-c]$")
@@ -156,15 +195,24 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'a' ])
         self.assertFalse(dropSeq)
         
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         seq = [ 'text', 0, 'd' ]
-        pos, outSeq, dropSeq = expr.match(seq, 1)
-        self.assertFalse(pos)
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertFalse(posDelta)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         seq = [ 'text', 0, u'a' ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 2)
         self.assertEqual(outSeq, [ 0, u'a' ])
         self.assertFalse(dropSeq)
+        
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
         
     def testEpsilonConcatination(self):
         expr1 = Epsilon()
@@ -205,6 +253,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, 'abc' ])
         self.assertFalse(dropSeq)
     
+        oResult = idExpr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testRepeat2(self):
         expr = Repeat(InsertNode('hoge'), 3, 3)
         seq = [ 'text' ]
@@ -214,6 +265,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'hoge' ], [ 'hoge' ], [ 'hoge' ] ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         expr = Repeat(InsertNode('hoge'), 3, 3) + Literal('a')
         seq = [ 'text', 0, 'a' ]
         
@@ -222,6 +276,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'hoge' ], [ 'hoge' ], [ 'hoge' ], 0, 'a' ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testAnyLiteral(self):
         expr = Repeat(AnyLiteral(), 0, None)
         seq = [ 'text', 0, "a", 1, "b", 2, "c" ]
@@ -231,6 +288,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ 0, "a", 1, "b", 2, "c" ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testAnyNode(self):
         expr = Repeat(AnyNode(), 0, None)
         seq = [ 'text', [ 'a' ], [ 'b' ], [ 'c' ] ]
@@ -244,6 +304,9 @@ class TestTorqExpression(unittest.TestCase):
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 0)
         
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testAnyNodeMatch(self):
         expr = Repeat(AnyNodeMatch(Literal('X')), 0, None)
         seq = [ 'text', [ 'a', 0, 'X' ], [ 'b', 1, 'X' ], [ 'c', 2, 'Y' ] ]
@@ -253,6 +316,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(outSeq, [ [ 'a', 0, 'X' ], [ 'b', 1, 'X' ] ])
         self.assertFalse(dropSeq)
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testReqs(self):
         def nomalize(r):
             if r is None: return None
@@ -282,10 +348,16 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(posDelta, 8)
         self.assertEqual(outSeq, [ [ "here" ], 0, "a", 1, "b", 2, "c", [ "here" ], 3, "a" ])
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         expr = Repeat(Or(Seq(InsertNode("here"), Literal("a")), Any()), 0, None)
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 8)
         self.assertEqual(outSeq, [ [ "here" ], 0, "a", 1, "b", 2, "c", [ "here" ], 3, "a" ])
+        
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
         
     def testSearch2(self):
         expr = Search(InsertNode("here"))
@@ -294,11 +366,17 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(posDelta, 6)
         self.assertEqual(outSeq, [ [ "here" ], 0, "a", [ "here" ], 1, "b", [ "here" ], 2, "c", [ "here" ] ])
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         expr = Repeat(Or(InsertNode("here"), Any()), 0, None)
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 0)
         self.assertEqual(outSeq, [ ])
     
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testRemoveRedundantParen(self):
         expr0 = Holder()
         expr0.expr = Or(Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
@@ -309,15 +387,21 @@ class TestTorqExpression(unittest.TestCase):
         seq = [ 'code', [ 'expr', [ 'literal', 0, 'a' ] ] ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 1)
-        outSeq = [ seq[0] ] + outSeq
-        self.assertEqual(outSeq, [ 'code', [ 'literal', 0, 'a' ] ])
+        outSeq2 = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq2, [ 'code', [ 'literal', 0, 'a' ] ])
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
         seq = [ 'code', [ 'expr', [ 'expr', [ 'literal', 0, 'a' ] ] ] ]
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 1)
-        outSeq = [ seq[0] ] + outSeq
-        self.assertEqual(outSeq, [ 'code', [ 'literal', 0, 'a' ] ])
+        outSeq2 = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq2, [ 'code', [ 'literal', 0, 'a' ] ])
 
+        oResult = expr.optimized().match(seq, 1)
+        self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
+        
     def testOptimizationThroughHolder(self):
         expr2 = Holder()
         expr1 = Literal("a")

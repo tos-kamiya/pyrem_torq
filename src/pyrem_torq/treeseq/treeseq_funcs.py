@@ -22,8 +22,7 @@ def seq_visit(seq): # yields ( curPos, in_or_out, node (or item) )
             assert len(item) >= 1
             yield curPos, mark_in, item
             for i in xrange(1, len(item)):
-                for v in seq_visit_i(curPos + [ i ], item[i]):
-                    yield v
+                for v in seq_visit_i(curPos + [ i ], item[i]): yield v # need PEP380
             yield curPos, mark_out, item
     return seq_visit_i([], seq)
 
@@ -46,8 +45,7 @@ def seq_outermost_node_iter(seq, label):
                 yield curPos, item
             else:
                 for i in xrange(1, len(item)):
-                    for v in soni_i(curPos + [ i ], item[i]):
-                        yield v
+                    for v in soni_i(curPos + [ i ], item[i]): yield v # need PEP380
     return soni_i([], seq)
 
 def seq_pretty(seq):
@@ -99,34 +97,77 @@ def seq_pretty(seq):
 
 def seq_remove_strattrs(seq):
     r = []; r_append = r.append
-    q = deque(seq)
-    r_append(q.popleft())
+    q = deque(seq); q_pl = q.popleft
+    r_append(q_pl())
     while q:
-        item = q.popleft()
+        item = q_pl()
         if item.__class__ is list:
             r_append(seq_remove_strattrs(item))
         else:
-            r_append(q.popleft())
+            r_append(q_pl())
+    return r
+            
+def seq_extract_strattrs(seq):
+    r = []; r_append = r.append
+    q = deque(seq); q_pl = q.popleft
+    r_append(q_pl())
+    while q:
+        item = q_pl()
+        if item.__class__ is list:
+            r_append(seq_extract_strattrs(item))
+        else:
+            r_append(item)
+            q_pl()
+    return r
+            
+def seq_split_strattrs(seq):
+    a = []; a_append = a.append
+    s = []; s_append = s.append
+    q = deque(seq); q_pl = q.popleft
+    item = q_pl()
+    a_append(item)
+    s_append(item)
+    while q:
+        item = q_pl()
+        if item.__class__ is list:
+            ai, si = seq_split_strattrs(item)
+            a_append(ai)
+            s_append(si)
+        else:
+            a_append(item)
+            s_append(q_pl())
+    return a, s
+            
+def seq_merge_strattrs(atrSeq, strSeq):
+    assert len(atrSeq) == len(strSeq)
+    assert strSeq[0] == atrSeq[0]
+    r = [ strSeq[0] ]; r_append = r.append
+    for aItem, sItem in zip(atrSeq[1:], strSeq[1:]):
+        if aItem.__class__ is list:
+            r_append(seq_merge_strattrs(aItem, sItem))
+        else:
+            r_append(aItem)
+            r_append(sItem)
     return r
             
 def seq_enclose_strattrs(seq):
     r = []; r_append = r.append
-    q = deque(seq)
-    r_append(q.popleft())
+    q = deque(seq); q_pl = q.popleft
+    r_append(q_pl())
     while q:
-        item = q.popleft()
+        item = q_pl()
         if item.__class__ is list:
             r_append(seq_enclose_strattrs(item))
         else:
-            r_append(( item, q.popleft() ))
+            r_append(( item, q_pl() ))
     return r
 
 def seq_disclose_strattrs(seq):
     r = []; r_append = r.append; r_extend = r.extend
-    q = deque(seq)
-    r_append(q.popleft())
+    q = deque(seq); q_pl = q.popleft
+    r_append(q_pl())
     while q:
-        item = q.popleft()
+        item = q_pl()
         if item.__class__ is list:
             r_append(seq_disclose_strattrs(item))
         elif item.__class__ is tuple:

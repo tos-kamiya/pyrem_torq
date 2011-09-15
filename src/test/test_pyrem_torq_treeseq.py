@@ -46,3 +46,19 @@ class TestTorqTreeseq(unittest.TestCase):
         seq = [ 'a', [ 'B', ( 1, 'b' ) ], 'c' ]
         with self.assertRaises(TypeError):
             seq_disclose_strattrs(seq)
+    
+    def testSplitAndMergeStrattrs(self):
+        seq = [ 'a', 1, 'b', 2, 'c' ]
+        atrSeq, strSeq = seq_split_strattrs(seq)
+        self.assertEquals(strSeq, [ 'a', 'b', 'c' ])
+        self.assertEquals(atrSeq, [ 'a', 1, 2 ])
+        mergedSeq = seq_merge_strattrs(atrSeq, strSeq)
+        self.assertEquals(mergedSeq, seq)
+        
+        seq = [ 'a', [ 'B', 1, 'b' ], 2, 'c' ]
+        atrSeq, strSeq = seq_split_strattrs(seq)
+        self.assertEquals(strSeq, [ 'a', [ 'B', 'b' ], 'c' ])
+        self.assertEquals(atrSeq, [ 'a', [ 'B', 1 ], 2 ])
+        mergedSeq = seq_merge_strattrs(atrSeq, strSeq)
+        self.assertEquals(mergedSeq, seq)
+        

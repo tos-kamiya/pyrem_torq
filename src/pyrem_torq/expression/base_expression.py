@@ -60,7 +60,7 @@ class TorqExpression(object):
             Otherwise, returns None.
         '''
         
-        p, o, d = self.match(inpSeq, 1)
+        p, o, _ = self.match(inpSeq, 1)
         if 1 + p != len(inpSeq): return None
         if dropSeq is not None: dropSeq.extend(o)
         newSeq = [ inpSeq[0] ]; newSeq.extend(o)
@@ -140,7 +140,7 @@ class TorqExpressionSingleton(TorqExpression):
 def _orflatener(exprs):
     for e in exprs:
         if e.__class__ is Or:
-            for i in _orflatener(e.exprs): yield i
+            for i in _orflatener(e.exprs): yield i # need PEP380
         else: yield e
 
 class Or(TorqExpression):
@@ -232,7 +232,7 @@ class Or(TorqExpression):
 def _seqflatener(exprs):
     for e in exprs:
         if e.__class__ is Seq:
-            for i in _seqflatener(e.exprs): yield i
+            for i in _seqflatener(e.exprs): yield i # need PEP380
         else: yield e
 
 class Seq(TorqExpression):
@@ -465,18 +465,19 @@ class Search(TorqExpressionWithExpr):
             lookAhead = inpSeq[curInpPos]
             if lookAhead.__class__ is list:
                 r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
+                if r is not None:
+                    p, o, d = r
+                    curInpPos += p; o_xt(o); d_xt(d)
+                if r is None or p == 0:
+                    o_ap(lookAhead)
+                    curInpPos += 1
             else:
                 #assert lookAhead.__class__ is int #debug
                 r = self._expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
-            if r is not None:
-                p, o, d = r
-                curInpPos += p; o_xt(o); d_xt(d)
-            if r is None or p == 0:
-                if lookAhead.__class__ is list:
-                    o_ap(lookAhead)
-                    curInpPos += 1
-                else:
-                    #assert lookAhead.__class__ is int #debug
+                if r is not None:
+                    p, o, d = r
+                    curInpPos += p; o_xt(o); d_xt(d)
+                if r is None or p == 0:
                     o_ap(lookAhead)
                     o_ap(inpSeq[curInpPos + 1])
                     curInpPos += 2

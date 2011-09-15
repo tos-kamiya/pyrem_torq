@@ -108,6 +108,13 @@ class TestTorqComile(unittest.TestCase):
     def test19th(self):
         self.assertRaises(KeyError, compiling, "@undefined_label;")
 
+    def testCompileAnyNode(self):
+        expr = compiling("any_node;")
+        self.assertEquals(expr, pyrem_torq.expression.AnyNode())
+        
+        expr = compiling("<>any_node;")
+        self.assertEquals(expr, pyrem_torq.expression.AnyNode(newLabel=pyrem_torq.expression.FLATTEN))
+        
 if __name__ == '__main__':
     unittest.main()
     

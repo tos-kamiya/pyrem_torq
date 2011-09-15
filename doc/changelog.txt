@@ -20,6 +20,7 @@ Known Bugs
     as an API.)
   - Added a method optimized() to TorqExpression and its descendant classes. 
     (the optimized() methods have been split from the old build() methods.)
+  - Bug fix: the complie() function generated wrong code for a spacial node "any_node".
 
 0.3 2010/03/11
   - Changed module name from pytorqy to pyrem_torq.

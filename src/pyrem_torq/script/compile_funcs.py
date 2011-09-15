@@ -1,6 +1,5 @@
-from __future__ import with_statement
 from contextlib import contextmanager
-
+import re
 import string
 
 import pyrem_torq.expression as _pte
@@ -54,7 +53,8 @@ def parse_to_ast(inputSeq, verboseOutput=None):
             yield
     
     with verbose_print_step_title_and_result_seq('input'):
-        s = [ 'code' ] + split_to_strings(inputSeq)
+        pat = re.compile(r"\d+|[a-z_][a-z_0-9]*|\r\n|.", re.DOTALL | re.IGNORECASE)
+        s = [ 'code' ] + split_to_strings(inputSeq, pat)
         seq[:] = s
     
     with verbose_print_step_title_and_result_seq('ParseToken'):
@@ -100,7 +100,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     with verbose_print_step_title_and_result_seq('parseReservedWords'):
         def parseReservedWordsExpr():
             def rw(name): return NM('id', L(name), newLabel=name) # reserved word
-            reservedWordExpr = rw('req') | rw('error') | rw('any') | rw('any_node') | rw('null')
+            reservedWordExpr = rw('req') | rw('error') | rw('any') | rw('null')
             return _pte.Search(reservedWordExpr)
         seq[:] = parseReservedWordsExpr().parse(seq)
     
@@ -346,6 +346,8 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             if len_seq != 3: raise CompileError("Invalid flatten(<>) expr", seq1)
             label = _id2Label(seq[2])
             if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
+            if label == "any_node":
+                return _pte.AnyNode(newLabel=_pte.FLATTEN)
             return _pte.Node(label, newLabel=_pte.FLATTEN)
         elif seq1NodeName in _nameToBuiltinFunc:
             if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
@@ -364,12 +366,11 @@ def _cnv_i(seq, replaceTable, literalExprPool):
     elif seq0 == "any":
         assert len_seq == 3
         return _pte.Any()
-    elif seq0 == "any_node":
-        assert len_seq == 3
-        return _pte.AnyNode()
     elif seq0 == 'id':
         label = _id2Label(seq)
         if not label: raise CompileError("Invalid Label", seq0)
+        if label == "any_node":
+            return _pte.AnyNode()
         return _pte.Node(label)
     elif seq0 == 'marker':
         label = _marker2Label(seq)
