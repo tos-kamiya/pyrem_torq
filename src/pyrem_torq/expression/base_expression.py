@@ -1,7 +1,20 @@
 from itertools import chain as _chain
+        
+def inner_expr_iter(expr):
+    visitedExprIDSet = set()
+    def iei_i(e):
+        ide = id(e)
+        if ide in visitedExprIDSet: return # prevent infinite recursion
+        
+        visitedExprIDSet.add(ide)
+        if hasattr(e, "extract_exprs"):
+            for item in e.extract_exprs():
+                if item is not None:
+                    yield item
+                    for v in iei_i(item): yield v # need PEP380
+    return iei_i(expr)
 
 class InvalidRepetitionCount(ValueError): pass
-class LeftRecursionError(ValueError): pass
 
 class MatchCandidateForLookAhead:
     def __init__(self, nodes=[], literals=[], emptyseq=False):
@@ -46,7 +59,7 @@ class MatchCandidateForLookAhead:
         L.append(self.__emptyseq)
         return sum(map(hash, L))
     
-_zeroLengthReturnValue = 0, (), ()
+_zeroLengthReturnValue = 0, ()
 
 class TorqExpression(object):
     ''' A base class of torq expression classes. (Abstract class.) '''
@@ -75,8 +88,8 @@ class TorqExpression(object):
     def match(self, inpSeq, inpPos):
         ''' Do matching of the expression and input sequence.
             If a substring inpSeq[inpPos:x] is matched by the expression (self),
-            returns a tuple of (length of matching substring, list of output nodes, list of dropped nodes).
-            Otherwise, returns a tuple (0, [], []).
+            returns a tuple of (length of matching substring, list of output nodes).
+            Otherwise, returns a tuple (0, []).
         '''
         
         assert inpPos >= 1
@@ -91,22 +104,20 @@ class TorqExpression(object):
             else:
                 #assert lookAhead.__class__ is int #debug
                 r = self._match_lit(inpSeq, inpPos, ( lookAhead, inpSeq[inpPos + 1] ))
-        if r is None: return 0, [], []
-        p, o, d = r
+        if r is None: return 0, []
+        p, o = r
         if o.__class__ is not list: o = list(o)
-        if d.__class__ is not list: d = list(d)
-        return p, o, d
+        return p, o
     
-    def parse(self, inpSeq, dropSeq=None):
+    def parse(self, inpSeq):
         ''' Do matching of the expression and input sequence.
             If the entire inpSeq is matched by the expression (self),
             returns list of output nodes.
             Otherwise, returns None.
         '''
         
-        p, o, _ = self.match(inpSeq, 1)
+        p, o = self.match(inpSeq, 1)
         if 1 + p != len(inpSeq): return None
-        if dropSeq is not None: dropSeq.extend(o)
         newSeq = [ inpSeq[0] ]; newSeq.extend(o)
         return newSeq
     
@@ -256,7 +267,7 @@ class Or(TorqExpression):
         #else: return None
         
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
+        #assert len(lookAheadString) == 2
         for expr in self.__ltbl_get(lookAheadString[1], self.__unknown_llst):
             r = expr._match_lit(inpSeq, inpPos, lookAheadString)
             if r is not None:
@@ -340,11 +351,10 @@ class Seq(TorqExpression):
     
     def __match_tail(self, inpSeq, inpPos, r):
         if r is None: return None
-        p, o, d = r
+        p, o = r
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos + p
         outSeq = o if o.__class__ is list else list(o); o_xt = outSeq.extend
-        dropSeq = d if d.__class__ is list else list(d); d_xt = dropSeq.extend
         for expr in self.__exprs[1:]:
             if curInpPos == len_inpSeq:
                 r = expr._match_eon(inpSeq, curInpPos, None)
@@ -356,9 +366,9 @@ class Seq(TorqExpression):
                     #assert lookAhead.__class__ is int #debug
                     r = expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
             if r is None: return None
-            p, o, d = r
-            curInpPos += p; o_xt(o); d_xt(d)
-        return curInpPos - inpPos, outSeq, dropSeq
+            p, o = r
+            curInpPos += p; o_xt(o)
+        return curInpPos - inpPos, outSeq
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         return self.__match_tail(inpSeq, inpPos, self.__expr0._match_node(inpSeq, inpPos, lookAheadNode))
@@ -371,11 +381,10 @@ class Seq(TorqExpression):
         for expr in self.__exprs:
             r = expr._match_eon(inpSeq, inpPos, lookAheadDummy)
             if r is None: return None
-            p, o, d = r
+            p, o = r
             #assert p == 0
-            #assert not d
             outSeq.extend(o)
-        return 0, outSeq, ()
+        return 0, outSeq
 
     def getMatchCandidateForLookAhead(self): 
         return self.__mc4la
@@ -418,7 +427,6 @@ class Repeat(TorqExpressionWithExpr):
         assert inpPos < len_inpSeq
         curInpPos = inpPos
         outSeq = []; o_xt = outSeq.extend
-        dropSeq = []; d_xt = dropSeq.extend
         
         ul = self.__upperLimit if self.__upperLimit is not None else (len_inpSeq - inpPos)
         # inpPos will increase 1 or more by a repetition so we can't repeat the following loop over (len_inpSeq - inpPos) times.
@@ -435,19 +443,19 @@ class Repeat(TorqExpressionWithExpr):
             if r is None:
                 if count < 0: return None
                 break # for count
-            p, o, d = r
+            p, o = r
             if p == 0 and count >= 0: break # in order to avoid infinite loop
-            curInpPos += p; o_xt(o); d_xt(d)
+            curInpPos += p; o_xt(o)
             count += 1
         if curInpPos == len_inpSeq and count < 0:
             r = self._expr._match_eon(inpSeq, inpPos, None)
             if r is None: return None
-            p, o, d = r
+            p, o = r
             #assert p == 0
             #assert not d
             if o.__class__ is not list: o = list(o)
             o_xt(o * -count)
-        return curInpPos - inpPos, outSeq, dropSeq
+        return curInpPos - inpPos, outSeq
     
     _match_lit = _match_node
     
@@ -455,12 +463,11 @@ class Repeat(TorqExpressionWithExpr):
         r = self._expr._match_eon(inpSeq, inpPos, lookAheadDummy)
         if r is None:
             return _zeroLengthReturnValue if self.__lowerLimit == 0 else None
-        p, o, d = r
+        p, o = r
         #assert p == 0
-        #assert not d
         if self.__lowerLimit != 0:
             if o.__class__ is not list: o = list(o)
-            return 0, o * self.__lowerLimit, ()
+            return 0, o * self.__lowerLimit
         return _zeroLengthReturnValue
     
     def _eq_i(self, right, alreadyComparedExprs):
@@ -531,14 +538,13 @@ class Search(TorqExpressionWithExpr):
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos
         outSeq = []; o_xt = outSeq.extend; o_ap = outSeq.append
-        dropSeq = []; d_xt = dropSeq.extend
         while curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
             if lookAhead.__class__ is list:
                 r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
                 if r is not None:
-                    p, o, d = r
-                    curInpPos += p; o_xt(o); d_xt(d)
+                    p, o = r
+                    curInpPos += p; o_xt(o)
                 if r is None or p == 0:
                     o_ap(lookAhead)
                     curInpPos += 1
@@ -546,8 +552,8 @@ class Search(TorqExpressionWithExpr):
                 #assert lookAhead.__class__ is int #debug
                 r = self._expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
                 if r is not None:
-                    p, o, d = r
-                    curInpPos += p; o_xt(o); d_xt(d)
+                    p, o = r
+                    curInpPos += p; o_xt(o)
                 if r is None or p == 0:
                     o_ap(lookAhead)
                     o_ap(inpSeq[curInpPos + 1])
@@ -555,11 +561,10 @@ class Search(TorqExpressionWithExpr):
         if curInpPos == len_inpSeq:
             r = self._expr._match_eon(inpSeq, curInpPos, None)
             if r is not None:
-                p, o, d = r
+                p, o = r
                 #assert p == 0
-                #assert not d
                 o_xt(o)
-        return curInpPos - inpPos, outSeq, dropSeq
+        return curInpPos - inpPos, outSeq
     
     _match_lit = _match_node
         
@@ -629,8 +634,8 @@ class Any(TorqExpressionSingleton):
     
     __slots__ = [ ]
 
-    def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ], ()
-    def _match_lit(self, inpSeq, inpPos, lookAheadString): return 2, lookAheadString, ()
+    def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ]
+    def _match_lit(self, inpSeq, inpPos, lookAheadString): return 2, lookAheadString
     
     def getMatchCandidateForLookAhead(self): 
         return _anyMc4la

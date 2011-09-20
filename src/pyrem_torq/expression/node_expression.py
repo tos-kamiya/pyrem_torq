@@ -39,12 +39,12 @@ class Node(TorqExpression):
         if lookAheadNode[0] == self.__label:
             if self.__newLabel is FLATTEN:
                 nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-                return 1, nodeContentIter, ()
+                return 1, nodeContentIter
             elif self.__newLabel is None:
-                return 1, ( lookAheadNode, ), ()
+                return 1, ( lookAheadNode, )
             else:
                 newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-                return 1, ( newNode, ), ()
+                return 1, ( newNode, )
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
@@ -90,12 +90,12 @@ class AnyNode(TorqExpression):
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if self.__newLabel is FLATTEN:
             nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-            return 1, nodeContentIter, ()
+            return 1, nodeContentIter
         elif self.__newLabel is None:
-            return 1, ( lookAheadNode, ), ()
+            return 1, ( lookAheadNode, )
         else:
             newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-            return 1, ( newNode, ), ()
+            return 1, ( newNode, )
     
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is AnyNode and self.__newLabel == right.newLabel
@@ -163,14 +163,14 @@ class NodeMatch(TorqExpressionWithExpr):
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
-        p, o, d = r
+        p, o = r
         if 1 + p != len_node: return None
         if self.__newLabel is FLATTEN:
-            return 1, o, d
+            return 1, o
         else:
             newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
             newNode.extend(o)
-            return 1, ( newNode, ), d
+            return 1, ( newNode, )
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is NodeMatch and \
@@ -225,14 +225,14 @@ class AnyNodeMatch(TorqExpressionWithExpr):
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
-        p, o, d = r
+        p, o = r
         if 1 + p != len_node: return None
         if self.__newLabel is FLATTEN:
-            return 1, o, d
+            return 1, o
         else:
             newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
             newNode.extend(o)
-            return 1, ( newNode, ), d
+            return 1, ( newNode, )
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is AnyNodeMatch and self.__newLabel == right.newLabel
@@ -278,12 +278,12 @@ class NodeClass(TorqExpression):
         if lookAheadNode[0] in self.__labels:
             if self.__newLabel is FLATTEN:
                 nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-                return 1, nodeContentIter, ()
+                return 1, nodeContentIter
             elif self.__newLabel is None:
-                return 1, ( lookAheadNode, ), ()
+                return 1, ( lookAheadNode, )
             else:
                 newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-                return 1, ( newNode, ), ()
+                return 1, ( newNode, )
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
@@ -345,7 +345,7 @@ class InsertNode(TorqExpression):
         self.__newLabel = newLabel
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return 0, ( [ self.__newLabel ], ), ()
+        return 0, ( [ self.__newLabel ], )
     _match_lit = _match_eon = _match_node
     
     def getMatchCandidateForLookAhead(self): return _insertingMc4la
@@ -385,10 +385,10 @@ class BuildToNode(TorqExpressionWithExpr):
     
     def __make_return_value(self, r):
         if r is None: return None
-        p, o, d = r
+        p, o = r
         newNode = [ self.__newLabel ]
         newNode.extend(o)
-        return p, ( newNode, ), d
+        return p, ( newNode, )
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         return self.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
@@ -427,44 +427,4 @@ class BuildToNode(TorqExpressionWithExpr):
         optimizedExpr = expr.optimized(objectpool)
         if optimizedExpr is not expr:
             return BuildToNode(self.__newLabel, optimizedExpr)
-        return self
-
-class Drop(TorqExpressionWithExpr):
-    ''' Drop expression matches to a sequence which the internal expression matches.
-       When matches, appends the matched sequence the current dropped sequence.
-    '''
-    
-    __slots__ = [ ]
-    
-    def __init__(self, expr):
-        self._set_expr(expr)
-    
-    @staticmethod
-    def __make_return_value(r):
-        if r is None: return None
-        p, o, d = r
-        if not d: return p, (), o
-        if not o: return p, (), d
-        dropSeq = d if d.__class__ is list else list(d)
-        dropSeq.extend(o)
-        return p, (), dropSeq
-    
-    def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return Drop.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
-    
-    def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        return Drop.__make_return_value(self._expr._match_lit(inpSeq, inpPos, lookAheadString))
-    
-    def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
-        return Drop.__make_return_value(self._expr._match_eon(inpSeq, inpPos, lookAheadDummy))
-    
-    def getMatchCandidateForLookAhead(self): 
-        return self.expr.getMatchCandidateForLookAhead()
-            
-    def optimized(self, objectpool={}):
-        if self.expr.__class__ is Epsilon or self.expr.__class__ is Never:
-            return self.expr.optimized(objectpool)
-        optimizedExpr = self.expr.optimized(objectpool)
-        if optimizedExpr is not self.expr:
-            return Drop(optimizedExpr)
         return self

@@ -13,9 +13,9 @@ class Literal(TorqExpression):
         self.__mc4la = MatchCandidateForLookAhead(literals=( self.__string, ))
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
+        #assert len(lookAheadString) == 2
         if self.__string == lookAheadString[1]:
-            return 2, lookAheadString, ()
+            return 2, lookAheadString
         #return None
     
     def __repr__(self): return "Literal(%s)" % repr(self.__string)
@@ -53,8 +53,8 @@ class AnyLiteral(TorqExpressionSingleton):
     __slots__ = [ ]
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
-        return 2, lookAheadString, ()
+        #assert len(lookAheadString) == 2
+        return 2, lookAheadString
     
     def __repr__(self): return "AnyLiteral()"
     def __hash__(self): return hash("AnyLiteral")
@@ -79,9 +79,9 @@ class LiteralClass(TorqExpression):
         self.__mc4la = MatchCandidateForLookAhead(literals=self.__strings)
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
+        #assert len(lookAheadString) == 2
         if lookAheadString[1] in self.__stringSet: 
-            return 2, lookAheadString, ()
+            return 2, lookAheadString
         #return None
     
     def __repr__(self): return "LiteralClass([%s])" % (",".join(repr(s) for s in self.__strings))
@@ -139,9 +139,9 @@ class Rex(TorqExpression):
         self.__ignoreCase = ignoreCase
         
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
+        #assert len(lookAheadString) == 2
         if self.__expression_match(lookAheadString[1]):
-            return 2, lookAheadString, ()
+            return 2, lookAheadString
         #return None
     
     def __repr__(self): return "Rex(%s,ignoreCase=%s)" % ( repr(self.__expressionstr), repr(self.__ignoreCase) ) 

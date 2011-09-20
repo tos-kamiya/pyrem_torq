@@ -2,11 +2,11 @@ from base_expression import *
 from literal_expression import Literal, LiteralClass
 from node_expression import Node, NodeClass
 
-_zeroLengthReturnValue = 0, (), ()
+_zeroLengthReturnValue = 0, ()
 
 class Require(TorqExpressionWithExpr):
     ''' Require expression matches to a sequence which the internal expression matches.
-       When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
+       When matches, do nothing to the input sequence, the output sequence.
     '''
     
     __slots__ = [ ]
@@ -124,12 +124,12 @@ class AnyBut(TorqExpressionWithExpr):
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if self._expr._match_node(inpSeq, inpPos, lookAheadNode) is None: 
-            return 1, ( lookAheadNode, ), ()
+            return 1, ( lookAheadNode, )
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         #assert len(lookAheadString) == 2
         if self._expr._match_lit(inpSeq, inpPos, lookAheadString) is None: 
-            return 2, lookAheadString, ()
+            return 2, lookAheadString
         
     def getMatchCandidateForLookAhead(self): return _atLeastOneItemMc4la
     

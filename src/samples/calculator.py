@@ -1,6 +1,7 @@
 import re, collections
 import pyrem_torq
 from pyrem_torq.expression import *
+from pyrem_torq.treeseq import seq_split_nodes_of_label
 
 BtN = BuildToNode
 L = Literal
@@ -18,9 +19,11 @@ def tokenize(text):
 def _build_parsing_exprs():    
     r = []
     
+    def markNull(expr): return BuildToNode("null", expr)
+    
     # atomic
     expr0 = Holder()
-    parenV = BtN('v', Drop(L('(')) + [0,None]*(RequireBut(L(')')) + expr0) + Drop(L(')')))
+    parenV = BtN('v', markNull(L('(')) + [0,None]*(RequireBut(L(')')) + expr0) + markNull(L(')')))
     numberV = BtN('v', Rex(r"^(\d|[.])"))
     expr0.expr = parenV | numberV | Any()
     r.append(Search(expr0.expr))
@@ -90,6 +93,7 @@ usage: calculator <expr>
         newSeq = expr.parse(seq)
         if newSeq is None: raise SystemError
         seq = newSeq
+        seq = seq_split_nodes_of_label(seq, "null")[0]
     for L in ts.seq_pretty(ts.seq_remove_strattrs(seq)): print L # prints an seq
     result = interpret(ts.seq_remove_strattrs(seq))
     print result

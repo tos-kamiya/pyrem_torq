@@ -114,6 +114,11 @@ class TestTorqComile(unittest.TestCase):
         
         expr = compiling("<>any_node;")
         self.assertEquals(expr, pyrem_torq.expression.AnyNode(newLabel=pyrem_torq.expression.FLATTEN))
+    
+    def testNull(self):
+        pte = pyrem_torq.expression
+        expr = compiling('null <- "a";')
+        self.assertEqual(expr, pte.BuildToNode("null", pte.Literal("a")))
         
 if __name__ == '__main__':
     unittest.main()

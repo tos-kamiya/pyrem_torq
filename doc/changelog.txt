@@ -4,7 +4,7 @@ Pyremics Torq changelog
 Known Bugs
   - None.
 
-0.4 2011/09/14
+0.4 2011/09/20
   - Breaking change: Now pyrem_torq doesn't uses pyrem_strs.
     The treeseq structure includes each index of its inner strings.
   - Dropped pyrem_torq.expression_shortname.
@@ -21,6 +21,11 @@ Known Bugs
   - Added a method optimized() to TorqExpression and its descendant classes. 
     (the optimized() methods have been split from the old build() methods.)
   - Bug fix: the complie() function generated wrong code for a spacial node "any_node".
+  - TorqExpression.match() and .parse() now don't return a drop sequence as a thrid
+    return value. (because Drop() expression has been removed.)
+  - Removed Drop() expression. In order to drop sub-sequences, use
+    BuildToNode("null", expr) for Drop(expr), and do 
+    seq = seq_split_nodes_with_label(seq, "null")[0] afterwords.
 
 0.3 2010/03/11
   - Changed module name from pytorqy to pyrem_torq.

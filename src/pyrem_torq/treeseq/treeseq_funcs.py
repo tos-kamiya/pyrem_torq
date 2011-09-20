@@ -95,6 +95,25 @@ def seq_pretty(seq):
     seq_pretty_i(seq, "")
     return r
 
+def seq_split_nodes_of_label(seq, label):
+    removedItems = []; removedItems_append = removedItems.append
+    def _seq_split_nodes_of_label_i(seq):
+        r = []; r_append = r.append
+        q = iter(seq)
+        r_append(q.next())
+        for item in q:
+            if item.__class__ is list:
+                if item[0] == label:
+                    removedItems_append(item)
+                else:
+                    r_append(_seq_split_nodes_of_label_i(item))
+            else:
+                r_append(item)
+                r_append(q.next())
+        return r
+    r = _seq_split_nodes_of_label_i(seq)
+    return r, removedItems
+
 def seq_remove_strattrs(seq):
     r = []; r_append = r.append
     q = deque(seq); q_pl = q.popleft

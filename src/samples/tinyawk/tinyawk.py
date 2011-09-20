@@ -11,6 +11,7 @@
 
 from pyrem_torq import *
 from pyrem_torq.expression import *
+from pyrem_torq.treeseq import seq_split_nodes_of_label
 
 def split_to_str(text):
     p = re.compile("|".join([
@@ -98,13 +99,14 @@ def stmt_parsing_expr_iter():
     
 def expr_parsing_expr_iter():
     def operator_parser_iter():
+        def markNull(expr): return BuildToNode("null", expr)
         n = Node
         kit = extra.operator_builer.OperatorBuilder()
         kit.atomic_term_expr = Or(n("l_integer"), n("l_string"), n("l_regex"), n("id"))
         kit.composed_term_node_labels = ( "expr", )
         kit.generated_term_label = "expr"
         
-        yield "paren", kit.build_O_expr(( Drop(n("LP")), Drop(n("RP")) ))
+        yield "paren", kit.build_O_expr(( markNull(n("LP")), markNull(n("RP")) ))
         # Drop parentheses chars
         
         yield "index", kit.build_tO_expr(( n("LK"), n("RK") ))
@@ -360,6 +362,7 @@ def main(debugTrace=False):
             newSeq = expr.parse(seq)
         if newSeq is None: raise SystemError("parse error")
         seq = newSeq
+        seq = seq_split_nodes_of_label(seq, "null")[0]
     if debugWrite: debugWrite("\n".join(treeseq.seq_pretty(treeseq.seq_remove_strattrs(seq))) + "\n") # prints a seq
     
     seq = treeseq.seq_remove_strattrs(seq)

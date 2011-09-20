@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 
         seq = [ 'code' ] + split_to_strings(inputText)
         for expr in exprs:
-            posDelta, outSeq, dropSeq = expr.match(seq, 1)
+            posDelta, outSeq = expr.match(seq, 1)
             self.assertEqual(1 + posDelta, len(seq))
             seq = [ seq[0] ] + outSeq
         print "result seq=", "\n".join(pyrem_torq.treeseq.seq_pretty(seq))
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
         
         seq = [ 'code' ] + split_to_strings("abc\n")
 
-        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        posDelta, outSeq = expr.match(seq, 1)
         self.assertEqual(1 + posDelta, 5)
         self.assertEqual(outSeq, [ 0, 'abc', [ 'eol', 3, '\n' ], [ 'eof' ] ])
     
