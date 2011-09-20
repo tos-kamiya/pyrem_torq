@@ -23,13 +23,13 @@ class Require(TorqExpressionWithExpr):
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         if self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) is not None: return _zeroLengthReturnValue
     
-    def required_node_literal_epsilon(self):
-        return self.expr.required_node_literal_epsilon()
+    def getMatchCandidateForLookAhead(self): 
+        return self.expr.getMatchCandidateForLookAhead()
             
     def seq_merged(self, other):
         if self.expr.__class__ is Literal or self.expr.__class__ is LiteralClass or self.expr.__class__ is Node or self.expr.__class__ is NodeClass:
-            rs = self.required_node_literal_epsilon()
-            ro = other.required_node_literal_epsilon()
+            rs = self.getMatchCandidateForLookAhead()
+            ro = other.getMatchCandidateForLookAhead()
             if rs is None or ro is None: return None
             
             selfAcceptsEmpty = not not rs[2]
@@ -69,6 +69,10 @@ class RequireBut(TorqExpressionWithExpr):
         if right.__class__ is Any:
             return AnyBut(self.expr) 
 
+    def getMatchCandidateForLookAhead(self): 
+        return MatchCandidateForLookAhead(nodes=None, literals=None, 
+                emptyseq=not self.expr.getMatchCandidateForLookAhead().emptyseq)
+    
     def optimized(self, objectpool={}):
         if self.expr.__class__ is Never:
             return Epsilon().optimized(objectpool)
@@ -76,6 +80,8 @@ class RequireBut(TorqExpressionWithExpr):
             return Never().optimized(objectpool)
         return self
     
+_emptyMc4la = MatchCandidateForLookAhead(emptyseq=True)
+
 class EndOfNode(TorqExpressionSingleton):
     ''' EndOfNode expression matches to a position of end-of-sequence.
        When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
@@ -85,8 +91,9 @@ class EndOfNode(TorqExpressionSingleton):
     
     def _match_eon(self, inpSeq, curInpPos, lookAheadDummy): return _zeroLengthReturnValue
 
-    def required_node_literal_epsilon(self):
-        return (), (), True
+    def getMatchCandidateForLookAhead(self): return _emptyMc4la
+
+_insertingMc4la = MatchCandidateForLookAhead(nodes=None, literals=None, emptyseq=True)
             
 class BeginOfNode(TorqExpressionSingleton):
     ''' BeginOfNode expression matches to a position of beginning-of-sequence.
@@ -101,9 +108,11 @@ class BeginOfNode(TorqExpressionSingleton):
         
     _match_lit = _match_node
 
-    def required_node_literal_epsilon(self):
-        return (), (), True
-                    
+    def getMatchCandidateForLookAhead(self): 
+        return _insertingMc4la
+
+_atLeastOneItemMc4la = MatchCandidateForLookAhead(nodes=None, literals=None)            
+
 class AnyBut(TorqExpressionWithExpr):
     ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()).
     '''
@@ -118,10 +127,12 @@ class AnyBut(TorqExpressionWithExpr):
             return 1, ( lookAheadNode, ), ()
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        assert len(lookAheadString) == 2
+        #assert len(lookAheadString) == 2
         if self._expr._match_lit(inpSeq, inpPos, lookAheadString) is None: 
             return 2, lookAheadString, ()
         
+    def getMatchCandidateForLookAhead(self): return _atLeastOneItemMc4la
+    
     def optimized(self, objectpool={}):
         if self.expr.__class__ is Never:
             return Any().optimized(objectpool)

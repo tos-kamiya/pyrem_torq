@@ -244,7 +244,9 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(expr1plus2, Seq(Literal("a"), Literal("b")))
         
     def testIdentifier(self):
-        idExpr = Literal('_') + [0,]*(Literal('_') | Rex(r"^[a-zA-Z]") | Rex(r"^[0-9]")) | \
+        idExpr = Literal('_') + [0,]*(Literal('_') | \
+                Rex(r"^[a-zA-Z]") | \
+                Rex(r"^[0-9]")) | \
                 Rex(r"^[a-zA-Z]") + [0,]*(Literal('_') | Rex(r"^[a-zA-Z]") | Rex(r"^[0-9]"))
         seq = [ 'text', 0, 'abc' ]
         
@@ -322,23 +324,27 @@ class TestTorqExpression(unittest.TestCase):
     def testReqs(self):
         def nomalize(r):
             if r is None: return None
-            nodes, literals, epsilon = r
-            return list(nodes), list(literals), epsilon
+            nodes, literals, epsilon = r.nodes, r.literals, r.emptyseq
+            return (list(nodes) if nodes is not None else None), (list(literals) if literals is not None else None), epsilon
         
         expr = Require(Node("a"))
-        self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
+        self.assertEqual(nomalize(expr.getMatchCandidateForLookAhead()), 
                 ( [ 'a' ], [], False ))
         
         expr = Require(Literal("a"))
-        self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
+        self.assertEqual(nomalize(expr.getMatchCandidateForLookAhead()), 
                 ( [], [ 'a' ], False ))
         
         expr = Seq(Repeat(Literal("a"), 0, 1), Literal("b"))
-        self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
+        self.assertEqual(nomalize(expr.getMatchCandidateForLookAhead()), 
                 ( [], [ 'a', 'b' ], False ))
 
-        expr = Or(Seq(Repeat(Literal("a"), 0, 1), Literal("b")), Literal("c"))
-        self.assertEqual(nomalize(expr.required_node_literal_epsilon()), 
+        expr = Or(
+                  Seq(
+                      Repeat(Literal("a"), 0, 1), 
+                      Literal("b")), 
+                  Literal("c"))
+        self.assertEqual(nomalize(expr.getMatchCandidateForLookAhead()), 
                 ( [], [ 'a', 'b', 'c' ], False ))
     
     def testSearch(self):
@@ -369,19 +375,27 @@ class TestTorqExpression(unittest.TestCase):
         oResult = expr.optimized().match(seq, 1)
         self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
         
-        expr = Repeat(Or(InsertNode("here"), Any()), 0, None)
+        e1 = Or(InsertNode("here"), Any())
+        expr = Repeat(e1, 0, None)
         posDelta, outSeq, dropSeq = expr.match(seq, 1)
         self.assertEqual(posDelta, 0)
         self.assertEqual(outSeq, [ ])
     
         oResult = expr.optimized().match(seq, 1)
         self.assertEquals(oResult, ( posDelta, outSeq, dropSeq) )
-        
+
+    def testNodeInsideNode(self):        
+        expr = NodeMatch("expr", Node("expr") | Node("literal"))
+        seq = [ 'code', [ 'expr', [ 'expr' ] ] ]
+        posDelta, outSeq, dropSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 1)
+
     def testRemoveRedundantParen(self):
         expr0 = Holder()
-        expr0.expr = Or(Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
-            NodeMatch("expr", Search(expr0)),
-            Any())
+        expr0.expr = Or(
+                Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
+                NodeMatch("expr", Search(expr0)),
+                Any())
         expr = Search(expr0)
         
         seq = [ 'code', [ 'expr', [ 'literal', 0, 'a' ] ] ]
@@ -421,6 +435,12 @@ class TestTorqExpression(unittest.TestCase):
         expr3.expr = Or(expr1, Epsilon())
         optimizedExpr3 = expr3.optimized()
         self.assertEqual(optimizedExpr3, expr3.expr)
+    
+#    def testCheckingLeftRecursion(self):
+#        expr2 = Holder()
+#        expr1 = Or(expr2, Literal('a'))
+#        expr2.expr = expr1
+#        optimizedExpr2 = expr2.optimized()
         
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)
