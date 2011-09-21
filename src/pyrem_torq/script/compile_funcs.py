@@ -39,6 +39,8 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     XtA = _pte.AnyBut
     Holder = _pte.Holder
     def markNull(expr): return BtN("null", expr)
+    def flattened(nodeExpr): return _pte.Flattened(nodeExpr)
+    def relabeled(newLabel, nodeExpr): return _pte.Relabeled(newLabel, nodeExpr)
      
     seq = []
     if verboseOutput:
@@ -100,7 +102,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     
     with verbose_print_step_title_and_result_seq('parseReservedWords'):
         def parseReservedWordsExpr():
-            def rw(name): return NM('id', L(name), newLabel=name) # reserved word
+            def rw(name): return relabeled(name, NM('id', L(name))) # reserved word
             reservedWordExpr = rw('req') | rw('error') | rw('any')
             return _pte.Search(reservedWordExpr)
         seq[:] = parseReservedWordsExpr().parse(seq)
@@ -136,9 +138,9 @@ def parse_to_ast(inputSeq, verboseOutput=None):
             unaryOperatorExpr = Holder('unaryOperatorExpr')
             unaryOperatorExpr.expr = _pte.Or(recurseApplyAndParam(unaryOperatorExpr),
                 BtN('apply', (N("plus") | N("ques") | N("star") | N('search') | N('reqbut') | N('req') | N('anybut')) + unaryOperatorExpr),
-                BtN('error', markNull(N('error')) + N('string_literal', newLabel=_pte.FLATTEN)),
+                BtN('error', markNull(N('error')) + flattened(N('string_literal'))),
                 BtN('error', markNull(N('error')) + \
-                    NM('param', N('string_literal', newLabel=_pte.FLATTEN), newLabel=_pte.FLATTEN)),
+                    flattened(NM('param', flattened(N('string_literal'))))),
                 N('diamond') + N('id') + N('matches'), # special form
                 BtN('apply', IN("expand") + markNull(N('diamond')) + N('id')),
                 N('diamond') + _pte.ErrorExpr('operator <> only applicable to a node'),
@@ -186,7 +188,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
         def parseReduceRedundantParenExpr():
             paramExpr = Holder('paramExpr')
             term = NM('apply', A() + [0,]*paramExpr) | XtA(N('param'))
-            paramExpr.expr = NM('param', paramExpr, newLabel=_pte.FLATTEN) \
+            paramExpr.expr = flattened(NM('param', paramExpr)) \
                 | NM('param', AN()) \
                 | term
             return __fill(paramExpr.expr, "Can't parse redundant paren")
@@ -328,7 +330,8 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             if len_seq != 4: raise CompileError("Invalid NodeMatch(::) expr", seq1)
             label = _id2Label(seq[2])
             if not label: raise CompileError("Operator NodeMatch(::) requires an identifier", seq[2])
-            return _pte.NodeMatch(label, _cnv_i(seq[3], replaceTable, literalExprPool), newLabel=(_pte.FLATTEN if is_flatten else None))
+            e = _pte.NodeMatch(label, _cnv_i(seq[3], replaceTable, literalExprPool))
+            return _pte.Flattened(e) if is_flatten else e
         elif seq1NodeName == 'insert_subtree':
             if len_seq == 3:
                 label = _id2Label(seq[2])
@@ -349,8 +352,8 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             label = _id2Label(seq[2])
             if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
             if label == "any_node":
-                return _pte.AnyNode(newLabel=_pte.FLATTEN)
-            return _pte.Node(label, newLabel=_pte.FLATTEN)
+                return _pte.Flattened(_pte.AnyNode())
+            return _pte.Flattened(_pte.Node(label))
         elif seq1NodeName in _nameToBuiltinFunc:
             if len_seq != 3: raise CompileError("Invalid req/req^/any^ expr", seq1)
             r = _cnv_i(seq[2], replaceTable, literalExprPool)

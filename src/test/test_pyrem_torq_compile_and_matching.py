@@ -185,5 +185,15 @@ int main(int argc, char *argv[])
         seq = [ 'code' ] + split_to_strings(inputText)
         self.assertRaises(pyrem_torq.expression.InterpretErrorByErrorExpr, exprs[0].parse, seq)
     
+    def testFlattening(self):
+        BtN = pyrem_torq.expression.BuildToNode
+        N = pyrem_torq.expression.Node
+        Flattened = pyrem_torq.expression.Flattened
+        
+        exprs = compile_exprs([ r"lc <- <>c;" ])
+        assert len(exprs) == 1
+        
+        self.assertEqual(exprs[0], BtN("lc", Flattened(N("c"))))
+
 if __name__ == '__main__':
     unittest.main()

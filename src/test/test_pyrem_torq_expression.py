@@ -358,7 +358,7 @@ class TestTorqExpression(unittest.TestCase):
     def testRemoveRedundantParen(self):
         expr0 = Holder()
         expr0.expr = Or(
-                Require(NodeMatch("expr", Node("expr") | Node("literal"))) + NodeMatch("expr", expr0, newLabel=FLATTEN),
+                Require(NodeMatch("expr", Node("expr") | Node("literal"))) + Flattened(NodeMatch("expr", expr0)),
                 NodeMatch("expr", Search(expr0)),
                 Any())
         expr = Search(expr0)
@@ -401,12 +401,70 @@ class TestTorqExpression(unittest.TestCase):
         optimizedExpr3 = expr3.optimized()
         self.assertEqual(optimizedExpr3, expr3.expr)
     
-#    def testCheckingLeftRecursion(self):
-#        expr2 = Holder()
-#        expr1 = Or(expr2, Literal('a'))
-#        expr2.expr = expr1
-#        optimizedExpr2 = expr2.optimized()
+    def testCheckingLeftRecursion(self):
+        expr2 = Holder()
+        expr1 = Or(expr2, Literal('a'))
+        expr2.expr = expr1
+        self.assertTrue(expr2.isLeftRecursive())
+        self.assertTrue(expr1.isLeftRecursive())
+        
+        expr3 = Or(Literal('a'), expr1)
+        self.assertFalse(expr3.isLeftRecursive()) # expr3 includes a left-recursion expr, but expr3 itself is not left recursive.
+        
+        includesLeftRecursiveExpressions = any(e.isLeftRecursive() for e in expr3.extract_exprs())
+        self.assertTrue(includesLeftRecursiveExpressions)
 
+        expr = Or(Literal('b'), Literal('a'))
+        self.assertFalse(expr.isLeftRecursive())
+        
+        expr = Holder()
+        with self.assertRaises(LeftRecursionUndecided):        
+            expr.isLeftRecursive() # expr's inner expression is not assigned yet, thus undecidable.
+        
+    def testFlattening(self):
+        expr = BuildToNode("lc", Flattened(Node("c")))
+        
+        seq = [ 'code', [ 'c', 0, 'a' ] ]
+        posDelta, outSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 1)
+        outSeq2 = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq2, [ 'code', [ 'lc', 0, 'a' ] ])
+        
+    def testInsertNode(self):
+        expr = Seq(Node("c"), InsertNode("X"), Node("a"))
+
+        seq = [ 'code', [ 'c' ], [ 'a' ] ]
+        posDelta, outSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 2)
+        outSeq2 = [ seq[0] ] + outSeq
+        self.assertEqual(outSeq2, [ 'code', [ 'c' ], [ 'X' ], [ 'a' ] ])
+        
+    def testInnerExprProperties(self):
+        a = Node('a'); b = Node('b')
+        singleExprs = [ Repeat(a, 0, 1), Search(a), Holder(), 
+                Relabeled('c', a), Flattened(a), NodeMatch('c', a), AnyNodeMatch(a), BuildToNode('c', a) ]
+        multipleExprs = [ Or(a, b), Seq(a, b) ]
+        for e in singleExprs + multipleExprs:
+            self.assertTrue(hasattr(e, "extract_exprs"))
+        for e in singleExprs:
+            self.assertTrue(hasattr(e, "expr"))
+        for e in multipleExprs:
+            self.assertTrue(hasattr(e, "exprs"))
+    
+    def testNodeExprProperties(self):
+        nodeExprs = [ Node('a'), NodeMatch('a', Epsilon()) ]
+        for ne in nodeExprs:
+            self.assertTrue(hasattr(ne, "label"))
+            self.assertTrue(hasattr(ne, "extract_labels"))
+        
+        nodeClassExpr = NodeClass(['a', 'b', 'c'])
+        self.assertTrue(hasattr(nodeClassExpr, "labels"))
+        self.assertTrue(hasattr(nodeClassExpr, "extract_labels"))
+            
+        newLabelExprs = [ Relabeled('newa', Node('a')), InsertNode('a'), BuildToNode('a', Epsilon()) ]
+        for nle in newLabelExprs:
+            self.assertTrue(hasattr(nle, "newLabel"))
+        
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)
 

@@ -14,7 +14,13 @@ def inner_expr_iter(expr):
                     for v in iei_i(item): yield v # need PEP380
     return iei_i(expr)
 
-class InvalidRepetitionCount(ValueError): pass
+def optimize_simple_expr(expr, objectpool):
+    h = hash(expr)
+    for e in objectpool.get(h, []):
+        if e == expr:
+            return e
+    objectpool.setdefault(h, []).append(expr)
+    return expr
 
 class MatchCandidateForLookAhead:
     def __init__(self, nodes=[], literals=[], emptyseq=False):
@@ -53,13 +59,9 @@ class MatchCandidateForLookAhead:
         return "MatchCandiateForLookAhead(nodes=%s,literals=%s,emptyseq=%s)" % ( repr(self.__nodes), repr(self.__literals), repr(self.__emptyseq) )
         
     def __hash__(self):
-        L = []
-        L.extend(self.__nodes)
-        L.extend(self.__literals)
-        L.append(self.__emptyseq)
-        return sum(map(hash, L))
+        return sum(map(hash, _chain(self.__nodes, self.__literals, self.__emptyseq)))
     
-_zeroLengthReturnValue = 0, ()
+class LeftRecursionUndecided(ValueError): pass
 
 class TorqExpression(object):
     ''' A base class of torq expression classes. (Abstract class.) '''
@@ -160,6 +162,10 @@ class TorqExpression(object):
     
     def optimized(self, objectpool={}): return self
 
+    def _isLeftRecursive_i(self, target, visitedExprIdSet): return False
+    
+    def isLeftRecursive(self): return self._isLeftRecursive_i(self, set())
+
 class TorqExpressionWithExpr(TorqExpression):
     ''' (Abstract class.) intended to be used internally. '''
 
@@ -186,13 +192,13 @@ class TorqExpressionSingleton(TorqExpression):
         for e in objectpool.get(h, []):
             if e.__class__ is self.__class__:
                 return e
-        objectpool.setdefault(h, []).append(self)
+        objectpool.setdefault(h, [ self ])
         return self
     
-def _orflatener(exprs):
+def _target_expr_flatener(exprs, targetExprClz):
     for e in exprs:
-        if e.__class__ is Or:
-            for i in _orflatener(e.exprs): yield i # need PEP380
+        if e.__class__ is targetExprClz:
+            for i in _target_expr_flatener(e.exprs, targetExprClz): yield i # need PEP380
         else: yield e
 
 class Or(TorqExpression):
@@ -285,7 +291,7 @@ class Or(TorqExpression):
         return self.__mc4la
             
     def optimized(self, objectpool={}):
-        exprs = list(_orflatener(self.__exprs))
+        exprs = list(_target_expr_flatener(self.__exprs, Or))
         if not exprs: return Never().optimized(objectpool)
         mergedExprs = [ exprs[0] ]
         for e in exprs[1:]:
@@ -298,13 +304,16 @@ class Or(TorqExpression):
         return Never().optimized(objectpool) if not mergedExprs else \
                  mergedExprs[0] if len(mergedExprs) == 1 else \
                  Or(*mergedExprs)
-
-def _seqflatener(exprs):
-    for e in exprs:
-        if e.__class__ is Seq:
-            for i in _seqflatener(e.exprs): yield i # need PEP380
-        else: yield e
-
+    
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        for expr in self.__exprs:
+            if expr is target or expr._isLeftRecursive_i(target, visitedExprIdSet):
+                return True
+    
 class Seq(TorqExpression):
     ''' Seq expression matches a sequence, iff the sequence is a concatenation of the sequences, s1, s2, ...
     Here sequence s1 is matched by the 1st internal expression, s2 by 2nd, and so on.
@@ -366,8 +375,7 @@ class Seq(TorqExpression):
                     #assert lookAhead.__class__ is int #debug
                     r = expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
             if r is None: return None
-            p, o = r
-            curInpPos += p; o_xt(o)
+            curInpPos += r[0]; o_xt(r[1])
         return curInpPos - inpPos, outSeq
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
@@ -381,16 +389,15 @@ class Seq(TorqExpression):
         for expr in self.__exprs:
             r = expr._match_eon(inpSeq, inpPos, lookAheadDummy)
             if r is None: return None
-            p, o = r
-            #assert p == 0
-            outSeq.extend(o)
+            #assert r[0] == 0
+            outSeq.extend(r[1])
         return 0, outSeq
 
     def getMatchCandidateForLookAhead(self): 
         return self.__mc4la
             
     def optimized(self, objectpool={}):
-        exprs = list(_seqflatener(self.__exprs))
+        exprs = list(_target_expr_flatener(self.__exprs, Seq))
         if not exprs: return Epsilon().optimized(objectpool)
         mergedExprs = [ exprs[0] ]
         for e in exprs[1:]:
@@ -404,6 +411,32 @@ class Seq(TorqExpression):
                  mergedExprs[0] if len(mergedExprs) == 1 else \
                  Seq(*mergedExprs)
         
+    def __leftExprs_i(self, visitedExprIdSet): 
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return ()
+        visitedExprIdSet.add(id_self)
+        for expr in self.__exprs:
+            visitedExprIdSet.update(expr.__leftExprs_i(visitedExprIdSet))
+            
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        for expr in self.exprs:
+            mc4a = expr.getMatchCandidateForLookAhead()
+            if mc4a is None:
+                raise LeftRecursionUndecided(repr(expr))
+            if expr is target or expr._isLeftRecursive_i(target, visitedExprIdSet):
+                return True
+            if not mc4a.emptyseq:
+                return False
+            
+class InvalidRepetitionCount(ValueError): pass
+
+_zeroLengthReturnValue = 0, ()
+
 class Repeat(TorqExpressionWithExpr):
     ''' Repeat expression matches a sequence, iff a N-time repetition of the internal expression matches the sequence.
         Here, N is a integer, lowerLimit <= N <= upperLimit.
@@ -452,7 +485,6 @@ class Repeat(TorqExpressionWithExpr):
             if r is None: return None
             p, o = r
             #assert p == 0
-            #assert not d
             if o.__class__ is not list: o = list(o)
             o_xt(o * -count)
         return curInpPos - inpPos, outSeq
@@ -471,10 +503,9 @@ class Repeat(TorqExpressionWithExpr):
         return _zeroLengthReturnValue
     
     def _eq_i(self, right, alreadyComparedExprs):
-        rightClassIsRpeatOrRepeatZeroOrOne = isinstance(right, Repeat) # this line could be "... = right.__class__ is Repeat or right.__class__ is RepeatZeroOrOne", if the language permits to write so.
-        return rightClassIsRpeatOrRepeatZeroOrOne and \
+        return right.__class__ is Repeat and \
                 self.__lowerLimit == right.__lowerLimit and self.__upperLimit == right.__upperLimit and \
-                self.expr._eq_i(right, alreadyComparedExprs)
+                self.get()._eq_i(right, alreadyComparedExprs)
         
     def __repr__(self): 
         return "Repeat(%s,%s,%s)" % ( repr(self.expr), repr(self.__lowerLimit), repr(self.__upperLimit) )
@@ -504,8 +535,18 @@ class Repeat(TorqExpressionWithExpr):
             elif LU == (0, None): return Repeat.ZeroOrMore(seo)
             elif LU == (1, 1): return seo
             elif LU == (1, None): return Repeat.OneOrMore(seo)
-            else: return self
+            else: 
+                if hash(seo) in objectpool:
+                    return optimize_simple_expr(self, objectpool)
+                return self
         
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr is target or self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
 class _RepeatZeroOrOne(Repeat):
     __slots__ = [ ]
     
@@ -521,42 +562,49 @@ class _RepeatZeroOrOne(Repeat):
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         return self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) or _zeroLengthReturnValue
 
+_searchingMc4la = MatchCandidateForLookAhead(nodes=None, literals=None, emptyseq=True)
+
 class Search(TorqExpressionWithExpr):
     ''' Search(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
         The difference is: when expr matches an empty sequence at some position of inpSeq,
         the former matches the entire input sequence. the latter matches the empty sequence.
     '''
     
-    __slots__ = [ '__mc4la' ]
+    __slots__ = [ '__nodePred', '__literalPred' ]
     
     def __init__(self, expr):
         self._set_expr(expr)
         mc4la = expr.getMatchCandidateForLookAhead()
-        self.__mc4la = None if mc4la is None else MatchCandidateForLookAhead(nodes=mc4la.nodes, literals=mc4la.literals, emptyseq=True)
+        self.__nodePred = (lambda lah: True) if mc4la is None or mc4la.nodes is None else frozenset(mc4la.nodes).__contains__
+        self.__literalPred = (lambda lah: True) if mc4la is None or mc4la.literals is None else frozenset(mc4la.literals).__contains__
     
     def _match_node(self, inpSeq, inpPos, lookAhead):
+            
         len_inpSeq = len(inpSeq)
         curInpPos = inpPos
         outSeq = []; o_xt = outSeq.extend; o_ap = outSeq.append
         while curInpPos < len_inpSeq:
             lookAhead = inpSeq[curInpPos]
+            r = None
             if lookAhead.__class__ is list:
-                r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
-                if r is not None:
-                    p, o = r
-                    curInpPos += p; o_xt(o)
+                if self.__nodePred(lookAhead[0]):
+                    r = self._expr._match_node(inpSeq, curInpPos, lookAhead)
+                    if r is not None:
+                        p, o = r
+                        curInpPos += p; o_xt(o)
                 if r is None or p == 0:
                     o_ap(lookAhead)
                     curInpPos += 1
             else:
                 #assert lookAhead.__class__ is int #debug
-                r = self._expr._match_lit(inpSeq, curInpPos, ( lookAhead, inpSeq[curInpPos + 1] ))
-                if r is not None:
-                    p, o = r
-                    curInpPos += p; o_xt(o)
+                lookAheadLiteral = ( lookAhead, inpSeq[curInpPos + 1] )
+                if self.__literalPred(lookAheadLiteral[1]):
+                    r = self._expr._match_lit(inpSeq, curInpPos, lookAheadLiteral)
+                    if r is not None:
+                        p, o = r
+                        curInpPos += p; o_xt(o)
                 if r is None or p == 0:
-                    o_ap(lookAhead)
-                    o_ap(inpSeq[curInpPos + 1])
+                    o_xt(lookAheadLiteral)
                     curInpPos += 2
         if curInpPos == len_inpSeq:
             r = self._expr._match_eon(inpSeq, curInpPos, None)
@@ -572,13 +620,22 @@ class Search(TorqExpressionWithExpr):
         return self._expr._match_eon(inpSeq, inpPos, lookAhead)
     
     def getMatchCandidateForLookAhead(self): 
-        return self.__mc4la
+        return _searchingMc4la
     
     def optimized(self, objectpool={}):
         if self.expr.__class__ is Search:
             return self.expr.optimized(objectpool)
+        if hash(self.expr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
         return self
         
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr is target or self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
 class InterpretError(StandardError):
     def __init__(self, message):
         StandardError.__init__(self, message)

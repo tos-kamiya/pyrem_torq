@@ -44,8 +44,22 @@ class Require(TorqExpressionWithExpr):
     def optimized(self, objectpool={}):
         if self.expr.__class__ is Never or self.expr.__class__ is Epsilon:
             return self.expr.optimized(objectpool)
+        optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if optimizedExpr is not self.expr:
+            return Require(optimizedExpr)
         return self
 
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        if self is target:
+            return True
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
 class RequireBut(TorqExpressionWithExpr):
     ''' Require expression matches to a sequence which the internal expression DOES NOT matches.
        When matches, do nothing to the input sequence, the output sequence, the dropped sequence.
@@ -78,8 +92,22 @@ class RequireBut(TorqExpressionWithExpr):
             return Epsilon().optimized(objectpool)
         elif self.expr.__class__ is Epsilon:
             return Never().optimized(objectpool)
+        optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if optimizedExpr is not self.expr:
+            return RequireBut(optimizedExpr)
         return self
     
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        if self is target:
+            return True
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
 _emptyMc4la = MatchCandidateForLookAhead(emptyseq=True)
 
 class EndOfNode(TorqExpressionSingleton):
@@ -138,5 +166,16 @@ class AnyBut(TorqExpressionWithExpr):
             return Any().optimized(objectpool)
         elif self.expr.__class__ is Epsilon or self.expr.__class__ is Any:
             return Never().optimized(objectpool)
+        optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if optimizedExpr is not self.expr:
+            return AnyBut(optimizedExpr)
         return self
     
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr is target or self.expr._isLeftRecursive_i(target, visitedExprIdSet)

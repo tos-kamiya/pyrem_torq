@@ -1,6 +1,6 @@
 import re
 
-from base_expression import TorqExpression, TorqExpressionSingleton, MatchCandidateForLookAhead
+from base_expression import TorqExpression, TorqExpressionSingleton, MatchCandidateForLookAhead, optimize_simple_expr
 
 class Literal(TorqExpression):
     ''' Literal expression matches a sequence of characters, which is the same to the internal string. 
@@ -34,12 +34,7 @@ class Literal(TorqExpression):
         return None
     
     def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
+        return optimize_simple_expr(self, objectpool)
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is Literal and self.__string == right.__string
@@ -111,12 +106,7 @@ class LiteralClass(TorqExpression):
         return LiteralClass(mergedStrings)
 
     def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
+        return optimize_simple_expr(self, objectpool)
     
 class RexCompilationUnable(ValueError):
     pass
@@ -152,4 +142,8 @@ class Rex(TorqExpression):
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is Rex and \
                 self.__expressionstr == right.__expressionstr and self.__ignoreCase == right.__ignoreCase
+
+    def optimized(self, objectpool={}):
+        return optimize_simple_expr(self, objectpool)
+    
     

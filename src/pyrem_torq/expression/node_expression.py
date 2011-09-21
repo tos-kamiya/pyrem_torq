@@ -1,58 +1,145 @@
 from base_expression import *
 
-class __S(object):
-    __slots__ = [ '__name' ]
-    def __init__(self, name): self.__name = name
-    def __hash__(self): return hash(self.__name)
-    def __eq__(self, right): return self is right
-    def __ne__(self, right): return self is not right
-    def __repr__(self): return "%s" % self.__name
-FLATTEN = __S('FLATTEN')
+class EnsuredAcceptSingleNode: pass
+class NodeModifier: pass
 
-class ForbiddenNewLabel(ValueError):
-    pass
-
-class Node(TorqExpression):
-    ''' Node expression matches to a length-1 sequence of a node whose label is the same to the internal label.
-    '''
+class Relabeled(TorqExpressionWithExpr, NodeModifier):
+    __slots__ = [ '__newLabel' ]
     
-    __slots__ = [ '__label', '__newLabel', '__mc4la' ]
+    def __init__(self, newLabel, nodeExpr):
+        assert not isinstance(nodeExpr, NodeModifier)
+        assert isinstance(nodeExpr, EnsuredAcceptSingleNode)
+        assert newLabel
+        self.__newLabel = newLabel
+        self._set_expr(nodeExpr)
+
+    def getnewlabel(self): return self.__newLabel
+    newLabel = property(getnewlabel)
+    
+    def extract_new_labels(self): 
+        return [ self.__newLabel ]
+    
+    def _match_node(self, inpSeq, inpPos, lookAheadNode):
+        r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
+        if r is not None:
+            p, o = r
+            assert p == 1
+            newNode = o[0]
+            if not isinstance(newNode, list): newNode = list(newNode)
+            newNode[0] = self.__newLabel
+            return p, ( newNode, )
+
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Relabeled and self.expr._eq_i(right.expr, alreadyComparedExprs) and \
+                self.__newLabel == right.__newLabel
+    
+    def __repr__(self): return "Relabeled(%s,%s)" % ( repr(self.__newLabel), repr(self.expr) )
+    def __hash__(self): return hash("Relabeled") + hash(self.__newLabel) + hash(self.expr)
+    
+    def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
+    
+    def optimized(self, objectpool={}):
+        e = self.expr.optimized(objectpool)
+        if hash(e) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if e is not self.expr:
+            return Relabeled(self.__newLabel, e)
+        return self
+    
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
+class Flattened(TorqExpressionWithExpr, NodeModifier):
+    __slots__ = [ ]
+    
+    def __init__(self, nodeExpr):
+        assert not isinstance(nodeExpr, NodeModifier)
+        assert isinstance(nodeExpr, EnsuredAcceptSingleNode)
+        self._set_expr(nodeExpr)
+
+    def _match_node(self, inpSeq, inpPos, lookAheadNode):
+        r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
+        if r is not None:
+            p, o = r
+            assert p == 1
+            nodeContentIter = iter(o[0]); nodeContentIter.next()
+            return p, nodeContentIter
+        
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Flattened and self.expr._eq_i(right.expr, alreadyComparedExprs)
+    
+    def __repr__(self): return "Flattened(%s)" % repr(self.expr)
+    def __hash__(self): return hash("Flattened") + hash(self.expr)
+    
+    def getMatchCandidateForLookAhead(self): return self.expr.getMatchCandidateForLookAhead()
+    
+    def optimized(self, objectpool={}):
+        if isinstance(self.expr, Node):
+            return _FlattenedNode(self.expr.label).optimized(objectpool)
+        e = self.expr.optimized(objectpool)
+        if hash(e) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if e is not self.expr:
+            return Flattened(e)
+        return self
+    
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
+class _FlattenedNode(TorqExpressionWithExpr):
+    __slots__ = [ '__label', '__mc4la' ]
         
     def getlabel(self): return self.__label
     label = property(getlabel)
     
     def extract_labels(self): return [ self.__label ]
     
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
-    
-    def __init__(self, label, newLabel=None):
+    def __init__(self, label):
         self.__label = label
-        assert newLabel != ''
-        self.__newLabel = newLabel
         self.__mc4la = MatchCandidateForLookAhead(nodes=( self.__label, ))
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] == self.__label:
-            if self.__newLabel is FLATTEN:
-                nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-                return 1, nodeContentIter
-            elif self.__newLabel is None:
-                return 1, ( lookAheadNode, )
-            else:
-                newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-                return 1, ( newNode, )
+            nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
+            return 1, nodeContentIter
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is Node and self.__label == right.label and \
-                self.__newLabel == right.newLabel
+        return right.__class__ is _FlattenedNode and self.__label == right.label
     
-    def __repr__(self): return "Node(%s,newLabel=%s)" % ( repr(self.__label), repr(self.__newLabel) )
-    def __hash__(self): return hash("Node") + hash(self.__label) + hash(self.__newLabel)
+    def __repr__(self): return "_FlattenedNode(%s)" % repr(self.__label)
+    def __hash__(self): return hash("_FlattenedNode") + hash(self.__label)
+    
+    def getMatchCandidateForLookAhead(self): return self.__mc4la
+            
+    def optimized(self, objectpool={}):
+        return optimize_simple_expr(self, objectpool)
+            
+class Node(TorqExpression, EnsuredAcceptSingleNode):
+    ''' Node expression matches to a length-1 sequence of a node whose label is the same to the internal label.
+    '''
+    
+    __slots__ = [ '__label', '__mc4la' ]
+        
+    def getlabel(self): return self.__label
+    label = property(getlabel)
+    
+    def extract_labels(self): return [ self.__label ]
+    
+    def __init__(self, label):
+        self.__label = label
+        self.__mc4la = MatchCandidateForLookAhead(nodes=( self.__label, ))
+        
+    def _match_node(self, inpSeq, inpPos, lookAheadNode):
+        if lookAheadNode[0] == self.__label:
+            return 1, ( lookAheadNode, )
+        #return None
+    
+    def _eq_i(self, right, alreadyComparedExprs):
+        return right.__class__ is Node and self.__label == right.label
+    
+    def __repr__(self): return "Node(%s)" % repr(self.__label)
+    def __hash__(self): return hash("Node") + hash(self.__label)
     
     def getMatchCandidateForLookAhead(self): return self.__mc4la
             
@@ -62,46 +149,21 @@ class Node(TorqExpression):
         return None
 
     def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
+        return optimize_simple_expr(self, objectpool)
 
 _anyNodeMc4la = MatchCandidateForLookAhead(nodes=None)
 
-class AnyNode(TorqExpression):
+class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
     ''' Node expression matches to a length-1 sequence of a node.
     '''
     
-    __slots__ = [ '__newLabel' ]
-        
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
-    
-    def __init__(self, newLabel=None):
-        assert newLabel != ''
-        self.__newLabel = newLabel
+    __slots__ = [ ]
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        if self.__newLabel is FLATTEN:
-            nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-            return 1, nodeContentIter
-        elif self.__newLabel is None:
-            return 1, ( lookAheadNode, )
-        else:
-            newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-            return 1, ( newNode, )
+        return 1, ( lookAheadNode, )
     
-    def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is AnyNode and self.__newLabel == right.newLabel
-    
-    def __repr__(self): return "AnyNode(newLabel=%s)" % repr(self.__newLabel)
-    def __hash__(self): return hash("AnyNode") + hash(self.__newLabel)
+    def __repr__(self): return "AnyNode()"
+    def __hash__(self): return hash("AnyNode")
     
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
             
@@ -109,40 +171,24 @@ class AnyNode(TorqExpression):
         if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
             return NodeClass.merged([ self, other ])
         return None
-
-    def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
     
-class NodeMatch(TorqExpressionWithExpr):
+class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
        - the label of the node is the same to the internal label, and 
        - the internal expression matches the node's internal sequence.
     '''
     
-    __slots__ = [ '__label', '__newLabel', '__mc4la' ]
+    __slots__ = [ '__label', '__mc4la' ]
     
     def getlabel(self): return self.__label
     label = property(getlabel)
     
     def extract_labels(self): return [ self.__label ]
     
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
-    
-    def __init__(self, label, expr, newLabel=None):
+    def __init__(self, label, expr):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
         self.__label = label
-        assert newLabel != ''
-        self.__newLabel = newLabel
         self.__mc4la = MatchCandidateForLookAhead(nodes=( self.__label, ))
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
@@ -163,51 +209,39 @@ class NodeMatch(TorqExpressionWithExpr):
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
-        p, o = r
-        if 1 + p != len_node: return None
-        if self.__newLabel is FLATTEN:
-            return 1, o
-        else:
-            newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
-            newNode.extend(o)
-            return 1, ( newNode, )
+        if 1 + r[0] != len_node: return None
+        newNode = [ lookAheadNode[0] ]
+        newNode.extend(r[1])
+        return 1, ( newNode, )
 
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is NodeMatch and \
-                self.__label == right.label and self.__newLabel == right.newLabel and \
-                self.expr._eq_i(right.expr)
+        return right.__class__ is NodeMatch and self.__label == right.label and self.expr._eq_i(right.expr, alreadyComparedExprs)
     
-    def __repr__(self): return "NodeMatch(%s,%s,newLabel=%s)" % \
-            ( repr(self.__label), repr(self.expr), repr(self.__newLabel) )
+    def __repr__(self): return "NodeMatch(%s,%s)" % \
+            ( repr(self.__label), repr(self.expr) )
             
-    def __hash__(self): return hash("NodeMatch") + hash(self.expr) + hash(self.__label) + hash(self.__newLabel)
+    def __hash__(self): return hash("NodeMatch") + hash(self.expr) + hash(self.__label)
 
     def getMatchCandidateForLookAhead(self): return self.__mc4la
             
     def optimized(self, objectpool={}):
         optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
         if optimizedExpr is not self.expr:
-            return NodeMatch(self.__label, self.expr, newLabel=self.__newLabel)
+            return NodeMatch(self.__label, self.expr)
         return self
 
-class AnyNodeMatch(TorqExpressionWithExpr):
+class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
         the internal expression matches the node's internal sequence.
     '''
     
-    __slots__ = [ '__newLabel' ]
+    __slots__ = [ ]
     
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
-    
-    def __init__(self, expr, newLabel=None):
+    def __init__(self, expr):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
-        assert newLabel != ''
-        self.__newLabel = newLabel
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         #assert self.expr != None
@@ -225,73 +259,54 @@ class AnyNodeMatch(TorqExpressionWithExpr):
         except InterpretError, e:
             e.stack.insert(0, inpPos); raise e
         if r is None: return None
-        p, o = r
-        if 1 + p != len_node: return None
-        if self.__newLabel is FLATTEN:
-            return 1, o
-        else:
-            newNode = [ lookAheadNode[0] if self.__newLabel is None else self.__newLabel ]
-            newNode.extend(o)
-            return 1, ( newNode, )
+        if 1 + r[0] != len_node: return None
+        newNode = [ lookAheadNode[0] ]
+        newNode.extend(r[1])
+        return 1, ( newNode, )
 
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is AnyNodeMatch and self.__newLabel == right.newLabel
+        return right.__class__ is AnyNodeMatch and self.expr._eq_i(right.expr, alreadyComparedExprs)
     
-    def __repr__(self): return "NodeMatch(%s,newLabel=%s)" % \
-            ( repr(self.expr), repr(self.__newLabel) )
+    def __repr__(self): return "NodeMatch(%s)" % repr(self.expr)
             
-    def __hash__(self): return hash("AnyNodeMatch") + hash(self.expr) + hash(self.__newLabel)
+    def __hash__(self): return hash("AnyNodeMatch") + hash(self.expr)
 
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
             
     def optimized(self, objectpool={}):
         optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
         if optimizedExpr is not self.expr:
             return AnyNodeMatch(self.expr, newLabel=self.__newLabel)
         return self
 
-class NodeClass(TorqExpression):
+class NodeClass(TorqExpression, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node whose
         label is the same to one of the internal labels.
     '''
     
-    __slots__ = [ '__newLabel', '__labels', '__mc4la' ]
+    __slots__ = [ '__labels', '__mc4la' ]
     
     def getlabels(self): return sorted(self.__labels)
     labels = property(getlabels)
     
     def extract_labels(self): return sorted(self.__labels)
     
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): 
-        return [ self.__newLabel ] if self.__newLabel not in ( None, FLATTEN ) else ()
-    
-    def __init__(self, labels, newLabel=None):
+    def __init__(self, labels):
         self.__labels = frozenset(labels)
-        assert newLabel != ''
-        self.__newLabel = newLabel
         self.__mc4la = MatchCandidateForLookAhead(nodes=sorted(self.__labels))
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] in self.__labels:
-            if self.__newLabel is FLATTEN:
-                nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-                return 1, nodeContentIter
-            elif self.__newLabel is None:
-                return 1, ( lookAheadNode, )
-            else:
-                newNode = lookAheadNode[:]; newNode[0] = self.__newLabel
-                return 1, ( newNode, )
+            return 1, ( lookAheadNode, )
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is NodeClass and self.__labels == right.__labels and \
-                self.__newLabel == right.__newLabel
+        return right.__class__ is NodeClass and self.__labels == right.__labels
     
-    def __repr__(self): return "NodeClass([%s],newLabel=%s)" % ( ",".join(repr(lbl) for lbl in sorted(self.__labels)), repr(self.__newLabel) )
-    def __hash__(self): return hash("NodeClass") + sum(map(hash, self.__labels)) + hash(self.__newLabel)
+    def __repr__(self): return "NodeClass([%s])" % ",".join(repr(lbl) for lbl in sorted(self.__labels))
+    def __hash__(self): return hash("NodeClass") + sum(map(hash, self.__labels))
     
     def getMatchCandidateForLookAhead(self): return self.__mc4la
             
@@ -303,34 +318,24 @@ class NodeClass(TorqExpression):
     @staticmethod
     def merged(nodeExprOrNodeClasss):
         if not nodeExprOrNodeClasss: return None
-        theNewLabel = nodeExprOrNodeClasss[0].newLabel
-        for item in nodeExprOrNodeClasss[1:]:
-            if item.newLabel != theNewLabel:
-                return None
         
         labelSet = set()
         for item in nodeExprOrNodeClasss:
             if item.__class__ is AnyNode:
-                return AnyNode(newLabel=theNewLabel)
+                return AnyNode()
             if item.__class__ is Node:
                 labelSet.add(item.label)
             elif item.__class__ is NodeClass:
                 labelSet.update(item.__labels)
-        return NodeClass(labelSet, newLabel=theNewLabel)
+        return NodeClass(labelSet)
 
     def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
+        return optimize_simple_expr(self, objectpool)
 
 _insertingMc4la = MatchCandidateForLookAhead(nodes=None, literals=None, emptyseq=True)
 
 class InsertNode(TorqExpression):
-    ''' InsertNode expression always matches, and inserts a node having the label at the
-        current position in the output sequence.
+    ''' InsertNode(label) is equivalent to BuildToNode(label, Epsilon()).
     '''
     
     __slots__ = [ '__newLabel' ]
@@ -341,7 +346,7 @@ class InsertNode(TorqExpression):
     def extract_new_labels(self): return [ self.__newLabel ]
     
     def __init__(self, newLabel):
-        assert newLabel not in ( None, '', FLATTEN )
+        assert newLabel
         self.__newLabel = newLabel
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
@@ -357,12 +362,7 @@ class InsertNode(TorqExpression):
     def __hash__(self): return hash("InsertNode") + hash(self.__newLabel)
 
     def optimized(self, objectpool={}):
-        h = hash(self)
-        for e in objectpool.get(h, []):
-            if e == self:
-                return e
-        objectpool.setdefault(h, []).append(self)
-        return self
+        return optimize_simple_expr(self, objectpool)
 
 class BuildToNode(TorqExpressionWithExpr):
     ''' BuildToNode expression matches to a sequence which the internal expression matches.
@@ -380,24 +380,26 @@ class BuildToNode(TorqExpressionWithExpr):
     def __init__(self, newLabel, expr):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
-        assert newLabel not in ( None, '', FLATTEN )
+        assert newLabel
         self.__newLabel = newLabel
     
-    def __make_return_value(self, r):
-        if r is None: return None
-        p, o = r
-        newNode = [ self.__newLabel ]
-        newNode.extend(o)
-        return p, ( newNode, )
-    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return self.__make_return_value(self._expr._match_node(inpSeq, inpPos, lookAheadNode))
+        r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
+        if r:
+            newNode = [ self.__newLabel ]; newNode.extend(r[1])
+            return r[0], ( newNode, )
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
-        return self.__make_return_value(self._expr._match_lit(inpSeq, inpPos, lookAheadString))
+        r = self._expr._match_lit(inpSeq, inpPos, lookAheadString)
+        if r:
+            newNode = [ self.__newLabel ]; newNode.extend(r[1])
+            return r[0], ( newNode, )
     
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
-        return self.__make_return_value(self._expr._match_eon(inpSeq, inpPos, lookAheadDummy))
+        r = self._expr._match_eon(inpSeq, inpPos, lookAheadDummy)
+        if r:
+            newNode = [ self.__newLabel ]; newNode.extend(r[1])
+            return r[0], ( newNode, )
     
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is BuildToNode and self.__newLabel == right.__newLabel and \
@@ -410,21 +412,19 @@ class BuildToNode(TorqExpressionWithExpr):
         return self.expr.getMatchCandidateForLookAhead()
             
     def optimized(self, objectpool={}):
-        expr = self.expr
-        newLabel = self.__newLabel
-        if expr.__class__ is Epsilon:
+        if self.expr.__class__ is Epsilon:
             return InsertNode(self.__newLabel).optimized(objectpool)
-        elif expr.__class__ is Never:
-            return expr.optimized(objectpool)
-        elif expr.__class__ is Node and expr.newLabel is FLATTEN:
-            return Node(expr.label, newLabel=newLabel).optimized(objectpool)
-        elif expr.__class__ is NodeMatch and expr.newLabel is FLATTEN:
-            return NodeMatch(expr.label, expr.expr, newLabel=newLabel).optimized(objectpool)
-        elif expr.__class__ is AnyNode and expr.newLabel is FLATTEN:
-            return AnyNode(newLabel=newLabel).optimized(objectpool)
-        elif expr.__class__ is NodeClass and expr.newLabel is FLATTEN:
-            return NodeClass(expr.labels, newLabel=newLabel).optimized(objectpool)
-        optimizedExpr = expr.optimized(objectpool)
-        if optimizedExpr is not expr:
+        optimizedExpr = self.expr.optimized(objectpool)
+        if hash(optimizedExpr) in objectpool:
+            return optimize_simple_expr(self, objectpool)
+        if optimizedExpr is not self.expr:
             return BuildToNode(self.__newLabel, optimizedExpr)
         return self
+
+    def _isLeftRecursive_i(self, target, visitedExprIdSet):
+        id_self = id(self)
+        if id_self in visitedExprIdSet:
+            return False
+        visitedExprIdSet.add(id_self)
+        return self.expr is target or self.expr._isLeftRecursive_i(target, visitedExprIdSet)
+            
