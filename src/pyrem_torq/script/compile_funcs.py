@@ -8,7 +8,7 @@ from pyrem_torq.utility import split_to_strings
 
 # Priority of operators
 # ()
-# + ? * <> ~ @ req req^ any^
+# + ? * [] ~ @ req req^ any^
 # ,
 # |
 # <- ::
@@ -77,7 +77,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 rst("comma", ","), rst("semicolon", ";"),
                 rst("matches", ":", ":"), rst("anybut", "any", "^"), rst("reqbut", "req", "^"),
                 rst("LP", "("), rst("RP", ")"), 
-                rst("plus", "+"), rst("ques", "?"), rst("star", "*"), rst("or", "|"), rst("diamond", "<", ">"),
+                rst("plus", "+"), rst("ques", "?"), rst("star", "*"), rst("or", "|"), rst("diamond", "[", "]"),
                 rst("search", "~"),
                 
                 # string literal
@@ -143,7 +143,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                     flattened(NM('param', flattened(N('string_literal'))))),
                 N('diamond') + N('id') + N('matches'), # special form
                 BtN('apply', IN("expand") + markNull(N('diamond')) + N('id')),
-                N('diamond') + _pte.ErrorExpr('operator <> only applicable to a node'),
+                N('diamond') + _pte.ErrorExpr('operator [] only applicable to a node'),
                 A())
             return _pte.Search(unaryOperatorExpr.expr)
         seq[:] = parseUnaryOperatorsExpr().parse(seq)
@@ -348,9 +348,9 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             if not label: raise CompileError("insert requires an identifier", seq[2])
             return _pte.InsertNode(label)
         elif seq1NodeName == 'expand':
-            if len_seq != 3: raise CompileError("Invalid flatten(<>) expr", seq1)
+            if len_seq != 3: raise CompileError("Invalid flatten([]) expr", seq1)
             label = _id2Label(seq[2])
-            if not label: raise CompileError("Operator flatten(<>) requires an identifier", seq[2])
+            if not label: raise CompileError("Operator flatten([]) requires an identifier", seq[2])
             if label == "any_node":
                 return _pte.Flattened(_pte.AnyNode())
             return _pte.Flattened(_pte.Node(label))

@@ -4,8 +4,9 @@ Created on 2009/07/22
 @author: kamiya
 '''
 
-import sys
+import sys, os
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import pyrem_torq.script
 import pyrem_torq.expression
 import pyrem_torq.treeseq
@@ -58,7 +59,7 @@ class TestTorqComile(unittest.TestCase):
 #        self.assertTrue(exprs == exprs2)
 
     def test8th(self):
-        exprStr = "(hoge <-), <>huga, (<>boo :: a), (<>foo :: ~b);"
+        exprStr = "(hoge <-), []huga, ([]boo :: a), ([]foo :: ~b);"
         compiling(exprStr)
     
     def test9th(self):
@@ -71,13 +72,13 @@ class TestTorqComile(unittest.TestCase):
         compiling('text :: ~(any^(eof, a) | *any^(eof));')
     
     def test12th(self):
-        compiling('text :: ~(a <- (<>b | <>c));')
+        compiling('text :: ~(a <- ([]b | []c));')
         
     def test13th(self):
         compiling('text :: ~(ri"[a-z]" | i"f");')
     
     def test14th(self):
-        compiling("hoge <- <>fuga;")
+        compiling("hoge <- []fuga;")
     
     def test15th(self):
         exprStr1 = "req^ a | b;"
@@ -113,7 +114,7 @@ class TestTorqComile(unittest.TestCase):
         expr = compiling("any_node;")
         self.assertEquals(expr, pte.AnyNode())
         
-        expr = compiling("<>any_node;")
+        expr = compiling("[]any_node;")
         self.assertEquals(expr, pte.Flattened(pte.AnyNode()))
     
     def testNull(self):

@@ -23,8 +23,8 @@ class Require(TorqExpressionWithExpr):
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         if self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) is not None: return _zeroLengthReturnValue
     
-    def getMatchCandidateForLookAhead(self): 
-        return self.expr.getMatchCandidateForLookAhead()
+    def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
             
     def seq_merged(self, other):
         if self.expr.__class__ is Literal or self.expr.__class__ is LiteralClass or self.expr.__class__ is Node or self.expr.__class__ is NodeClass:
@@ -32,24 +32,14 @@ class Require(TorqExpressionWithExpr):
             ro = other.getMatchCandidateForLookAhead()
             if rs is None or ro is None: return None
             
-            selfAcceptsEmpty = not not rs[2]
-            otherAcceptsEmpty = not not ro[2]
+            selfAcceptsEmpty = not not rs.emptyseq
+            otherAcceptsEmpty = not not ro.emptyseq
             if selfAcceptsEmpty >= otherAcceptsEmpty and \
-                    set(rs[0]).issuperset(set(ro[0])) and \
-                    set(rs[1]).issuperset(set(ro[1])):
+                    set(rs.nodes).issuperset(set(ro.nodes)) and \
+                    set(rs.literals).issuperset(set(ro.literals)):
                 # in this case, self's requirement is equivalent or superset to other's requirement.
                 # so self will not do filter out other than other does.
                 return other
-        
-    def optimized(self, objectpool={}):
-        if self.expr.__class__ is Never or self.expr.__class__ is Epsilon:
-            return self.expr.optimized(objectpool)
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return Require(optimizedExpr)
-        return self
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         if self is target:
@@ -84,20 +74,9 @@ class RequireBut(TorqExpressionWithExpr):
             return AnyBut(self.expr) 
 
     def getMatchCandidateForLookAhead(self): 
-        return MatchCandidateForLookAhead(nodes=None, literals=None, 
+        return MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, 
                 emptyseq=not self.expr.getMatchCandidateForLookAhead().emptyseq)
-    
-    def optimized(self, objectpool={}):
-        if self.expr.__class__ is Never:
-            return Epsilon().optimized(objectpool)
-        elif self.expr.__class__ is Epsilon:
-            return Never().optimized(objectpool)
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return RequireBut(optimizedExpr)
-        return self
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
     
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         if self is target:
@@ -121,7 +100,7 @@ class EndOfNode(TorqExpressionSingleton):
 
     def getMatchCandidateForLookAhead(self): return _emptyMc4la
 
-_insertingMc4la = MatchCandidateForLookAhead(nodes=None, literals=None, emptyseq=True)
+_insertingMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, emptyseq=True)
             
 class BeginOfNode(TorqExpressionSingleton):
     ''' BeginOfNode expression matches to a position of beginning-of-sequence.
@@ -139,7 +118,7 @@ class BeginOfNode(TorqExpressionSingleton):
     def getMatchCandidateForLookAhead(self): 
         return _insertingMc4la
 
-_atLeastOneItemMc4la = MatchCandidateForLookAhead(nodes=None, literals=None)            
+_atLeastOneItemMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM)
 
 class AnyBut(TorqExpressionWithExpr):
     ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()).
@@ -160,18 +139,6 @@ class AnyBut(TorqExpressionWithExpr):
             return 2, lookAheadString
         
     def getMatchCandidateForLookAhead(self): return _atLeastOneItemMc4la
-    
-    def optimized(self, objectpool={}):
-        if self.expr.__class__ is Never:
-            return Any().optimized(objectpool)
-        elif self.expr.__class__ is Epsilon or self.expr.__class__ is Any:
-            return Never().optimized(objectpool)
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return AnyBut(optimizedExpr)
-        return self
     
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         id_self = id(self)

@@ -3,8 +3,10 @@ Created on 2011/09/15
 
 @author: toshihiro
 '''
+import sys, os
 import unittest
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pyrem_torq.treeseq import *
 
 class TestTorqTreeseq(unittest.TestCase):
@@ -61,4 +63,11 @@ class TestTorqTreeseq(unittest.TestCase):
         self.assertEquals(atrSeq, [ 'a', [ 'B', 1 ], 2 ])
         mergedSeq = seq_merge_strattrs(atrSeq, strSeq)
         self.assertEquals(mergedSeq, seq)
-        
+ 
+         
+def TestSuite(TestTorqExpression):
+    return unittest.makeSuite(TestTorqTreeseq)
+
+if __name__ == '__main__':
+    unittest.main()
+

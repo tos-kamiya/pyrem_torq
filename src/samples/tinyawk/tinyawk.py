@@ -130,7 +130,7 @@ def expr_parsing_expr_iter():
         yield "expression " + desc, e
     
     yield "remove redundant paren", Search(script.compile("""
-    req(expr :: expr | l_integer | l_string | l_regex | id), (<>expr :: @0)
+    req(expr :: expr | l_integer | l_string | l_regex | id), ([]expr :: @0)
     | (expr :: id, LK, *(req^(RK), @0), RK) 
     | (expr :: ~@0) 
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
@@ -142,8 +142,8 @@ def expr_parsing_expr_iter():
     
     someExpr = script.compile("(l_integer | l_string | l_regex | id | (expr :: ~@0));")
     yield "reform comma expressions", Search(script.compile("""
-    (r_print, (<>expr :: @someExpr, +(comma, @someExpr)))
-    | (expr :: @someExpr, LK, (<>expr :: @someExpr, +((null <- comma), @someExpr), RK))
+    (r_print, ([]expr :: @someExpr, +(comma, @someExpr)))
+    | (expr :: @someExpr, LK, ([]expr :: @someExpr, +((null <- comma), @someExpr), RK))
     | (stmt :: ~@0) | (block :: ~@0) | (pa :: ~@0)
     | comma, error("unexpected comma (,)") 
     ;""", replaces={ "someExpr" : someExpr }))

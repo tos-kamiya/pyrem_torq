@@ -1,5 +1,6 @@
-import sys, re
+import sys, re, os
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pyrem_torq.utility import split_to_strings
 import pyrem_torq.expression
 import pyrem_torq.script
@@ -11,8 +12,6 @@ def compile_exprs(exprStrs):
     exprs = []
     for exprStr in exprStrs:
         expr = pyrem_torq.script.compile(exprStr)
-        
-        expr = expr.optimized()
         exprs.append(expr)
     return exprs
 
@@ -131,7 +130,7 @@ int main(int argc, char *argv[])
         
     def test7th(self):
         searchWordLike = r'~(word <- ("_", *("_" | r"^[a-zA-Z]" | r"^\d") | r"^[a-zA-Z]", *("_" | r"^[a-zA-Z]" | r"^\d")));'
-        searchIdMake = r'~(id <- <>word);'
+        searchIdMake = r'~(id <- []word);'
         
         exprs = compile_exprs([ searchWordLike, searchIdMake ])
         assert len(exprs) == 2
@@ -189,11 +188,13 @@ int main(int argc, char *argv[])
         BtN = pyrem_torq.expression.BuildToNode
         N = pyrem_torq.expression.Node
         Flattened = pyrem_torq.expression.Flattened
+        Relabeled = pyrem_torq.expression.Relabeled
         
-        exprs = compile_exprs([ r"lc <- <>c;" ])
+        exprs = compile_exprs([ r"lc <- []c;" ])
         assert len(exprs) == 1
         
-        self.assertEqual(exprs[0], BtN("lc", Flattened(N("c"))))
+        self.assertTrue(exprs[0] == BtN("lc", Flattened(N("c"))) or \
+                exprs[0] == Relabeled("lc", N("c")))
 
 if __name__ == '__main__':
     unittest.main()

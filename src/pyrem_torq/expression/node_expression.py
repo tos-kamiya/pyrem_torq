@@ -27,7 +27,7 @@ class Relabeled(TorqExpressionWithExpr, NodeModifier):
             newNode = o[0]
             if not isinstance(newNode, list): newNode = list(newNode)
             newNode[0] = self.__newLabel
-            return p, ( newNode, )
+            return p, [ newNode ]
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is Relabeled and self.expr._eq_i(right.expr, alreadyComparedExprs) and \
@@ -37,15 +37,8 @@ class Relabeled(TorqExpressionWithExpr, NodeModifier):
     def __hash__(self): return hash("Relabeled") + hash(self.__newLabel) + hash(self.expr)
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
-    
-    def optimized(self, objectpool={}):
-        e = self.expr.optimized(objectpool)
-        if hash(e) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if e is not self.expr:
-            return Relabeled(self.__newLabel, e)
-        return self
-    
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+		
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
             
@@ -71,22 +64,13 @@ class Flattened(TorqExpressionWithExpr, NodeModifier):
     def __repr__(self): return "Flattened(%s)" % repr(self.expr)
     def __hash__(self): return hash("Flattened") + hash(self.expr)
     
-    def getMatchCandidateForLookAhead(self): return self.expr.getMatchCandidateForLookAhead()
-    
-    def optimized(self, objectpool={}):
-        if isinstance(self.expr, Node):
-            return _FlattenedNode(self.expr.label).optimized(objectpool)
-        e = self.expr.optimized(objectpool)
-        if hash(e) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if e is not self.expr:
-            return Flattened(e)
-        return self
+    def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
     
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
             
-class _FlattenedNode(TorqExpressionWithExpr):
+class FlattenedNode(TorqExpression):
     __slots__ = [ '__label', '__mc4la' ]
         
     def getlabel(self): return self.__label
@@ -105,15 +89,12 @@ class _FlattenedNode(TorqExpressionWithExpr):
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is _FlattenedNode and self.__label == right.label
+        return right.__class__ is FlattenedNode and self.__label == right.label
     
-    def __repr__(self): return "_FlattenedNode(%s)" % repr(self.__label)
-    def __hash__(self): return hash("_FlattenedNode") + hash(self.__label)
+    def __repr__(self): return "FlattenedNode(%s)" % repr(self.__label)
+    def __hash__(self): return hash("FlattenedNode") + hash(self.__label)
     
     def getMatchCandidateForLookAhead(self): return self.__mc4la
-            
-    def optimized(self, objectpool={}):
-        return optimize_simple_expr(self, objectpool)
             
 class Node(TorqExpression, EnsuredAcceptSingleNode):
     ''' Node expression matches to a length-1 sequence of a node whose label is the same to the internal label.
@@ -132,7 +113,7 @@ class Node(TorqExpression, EnsuredAcceptSingleNode):
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] == self.__label:
-            return 1, ( lookAheadNode, )
+            return 1, [ lookAheadNode ]
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
@@ -148,10 +129,7 @@ class Node(TorqExpression, EnsuredAcceptSingleNode):
             return NodeClass.merged([ self, other ])
         return None
 
-    def optimized(self, objectpool={}):
-        return optimize_simple_expr(self, objectpool)
-
-_anyNodeMc4la = MatchCandidateForLookAhead(nodes=None)
+_anyNodeMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM)
 
 class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
     ''' Node expression matches to a length-1 sequence of a node.
@@ -160,7 +138,7 @@ class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
     __slots__ = [ ]
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return 1, ( lookAheadNode, )
+        return 1, [ lookAheadNode ]
     
     def __repr__(self): return "AnyNode()"
     def __hash__(self): return hash("AnyNode")
@@ -212,7 +190,7 @@ class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
         if 1 + r[0] != len_node: return None
         newNode = [ lookAheadNode[0] ]
         newNode.extend(r[1])
-        return 1, ( newNode, )
+        return 1, [ newNode ]
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is NodeMatch and self.__label == right.label and self.expr._eq_i(right.expr, alreadyComparedExprs)
@@ -223,14 +201,7 @@ class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("NodeMatch") + hash(self.expr) + hash(self.__label)
 
     def getMatchCandidateForLookAhead(self): return self.__mc4la
-            
-    def optimized(self, objectpool={}):
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return NodeMatch(self.__label, self.expr)
-        return self
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
 
 class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
@@ -262,7 +233,7 @@ class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
         if 1 + r[0] != len_node: return None
         newNode = [ lookAheadNode[0] ]
         newNode.extend(r[1])
-        return 1, ( newNode, )
+        return 1, [ newNode ]
 
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is AnyNodeMatch and self.expr._eq_i(right.expr, alreadyComparedExprs)
@@ -272,14 +243,7 @@ class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("AnyNodeMatch") + hash(self.expr)
 
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
-            
-    def optimized(self, objectpool={}):
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return AnyNodeMatch(self.expr, newLabel=self.__newLabel)
-        return self
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
 
 class NodeClass(TorqExpression, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node whose
@@ -299,7 +263,7 @@ class NodeClass(TorqExpression, EnsuredAcceptSingleNode):
         
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         if lookAheadNode[0] in self.__labels:
-            return 1, ( lookAheadNode, )
+            return 1, [ lookAheadNode ]
         #return None
     
     def _eq_i(self, right, alreadyComparedExprs):
@@ -329,10 +293,7 @@ class NodeClass(TorqExpression, EnsuredAcceptSingleNode):
                 labelSet.update(item.__labels)
         return NodeClass(labelSet)
 
-    def optimized(self, objectpool={}):
-        return optimize_simple_expr(self, objectpool)
-
-_insertingMc4la = MatchCandidateForLookAhead(nodes=None, literals=None, emptyseq=True)
+_insertingMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, emptyseq=True)
 
 class InsertNode(TorqExpression):
     ''' InsertNode(label) is equivalent to BuildToNode(label, Epsilon()).
@@ -350,7 +311,7 @@ class InsertNode(TorqExpression):
         self.__newLabel = newLabel
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        return 0, ( [ self.__newLabel ], )
+        return 0, [ [ self.__newLabel ] ]
     _match_lit = _match_eon = _match_node
     
     def getMatchCandidateForLookAhead(self): return _insertingMc4la
@@ -360,9 +321,6 @@ class InsertNode(TorqExpression):
     
     def __repr__(self): return "InsertNode(%s)" % repr(self.__newLabel) 
     def __hash__(self): return hash("InsertNode") + hash(self.__newLabel)
-
-    def optimized(self, objectpool={}):
-        return optimize_simple_expr(self, objectpool)
 
 class BuildToNode(TorqExpressionWithExpr):
     ''' BuildToNode expression matches to a sequence which the internal expression matches.
@@ -387,19 +345,19 @@ class BuildToNode(TorqExpressionWithExpr):
         r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
         if r:
             newNode = [ self.__newLabel ]; newNode.extend(r[1])
-            return r[0], ( newNode, )
+            return r[0], [ newNode ]
     
     def _match_lit(self, inpSeq, inpPos, lookAheadString):
         r = self._expr._match_lit(inpSeq, inpPos, lookAheadString)
         if r:
             newNode = [ self.__newLabel ]; newNode.extend(r[1])
-            return r[0], ( newNode, )
+            return r[0], [ newNode ]
     
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         r = self._expr._match_eon(inpSeq, inpPos, lookAheadDummy)
         if r:
             newNode = [ self.__newLabel ]; newNode.extend(r[1])
-            return r[0], ( newNode, )
+            return r[0], [ newNode ]
     
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is BuildToNode and self.__newLabel == right.__newLabel and \
@@ -408,18 +366,8 @@ class BuildToNode(TorqExpressionWithExpr):
     def __repr__(self): return "BuildToNode(%s,%s)" % (repr(self.__newLabel), repr(self.expr) )
     def __hash__(self): return hash("BuildToNode") + hash(self.__newLabel) + hash(self.expr)
 
-    def getMatchCandidateForLookAhead(self): 
-        return self.expr.getMatchCandidateForLookAhead()
-            
-    def optimized(self, objectpool={}):
-        if self.expr.__class__ is Epsilon:
-            return InsertNode(self.__newLabel).optimized(objectpool)
-        optimizedExpr = self.expr.optimized(objectpool)
-        if hash(optimizedExpr) in objectpool:
-            return optimize_simple_expr(self, objectpool)
-        if optimizedExpr is not self.expr:
-            return BuildToNode(self.__newLabel, optimizedExpr)
-        return self
+    def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         id_self = id(self)
@@ -427,4 +375,3 @@ class BuildToNode(TorqExpressionWithExpr):
             return False
         visitedExprIdSet.add(id_self)
         return self.expr is target or self.expr._isLeftRecursive_i(target, visitedExprIdSet)
-            
