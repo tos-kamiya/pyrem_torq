@@ -1,9 +1,3 @@
-'''
-Created on 2009/07/22
-
-@author: kamiya
-'''
-
 import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))

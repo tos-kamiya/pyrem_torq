@@ -4,6 +4,7 @@ class EnsuredAcceptSingleNode: pass
 class NodeModifier: pass
 
 class Relabeled(TorqExpressionWithExpr, NodeModifier):
+    ''' Relabeled is a expression to modify a label of a node.'''
     __slots__ = [ '__newLabel' ]
     
     def __init__(self, newLabel, nodeExpr):
@@ -38,11 +39,14 @@ class Relabeled(TorqExpressionWithExpr, NodeModifier):
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
     def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
-		
+
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
             
 class Flattened(TorqExpressionWithExpr, NodeModifier):
+    ''' Relabeled is a expression to flatten a node.
+        A node will be replaced with items inside the node in output sequence.
+    '''
     __slots__ = [ ]
     
     def __init__(self, nodeExpr):
@@ -70,34 +74,9 @@ class Flattened(TorqExpressionWithExpr, NodeModifier):
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
             
-class FlattenedNode(TorqExpression):
-    __slots__ = [ '__label', '__mc4la' ]
-        
-    def getlabel(self): return self.__label
-    label = property(getlabel)
-    
-    def extract_labels(self): return [ self.__label ]
-    
-    def __init__(self, label):
-        self.__label = label
-        self.__mc4la = MatchCandidateForLookAhead(nodes=( self.__label, ))
-        
-    def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        if lookAheadNode[0] == self.__label:
-            nodeContentIter = iter(lookAheadNode); nodeContentIter.next()
-            return 1, nodeContentIter
-        #return None
-    
-    def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is FlattenedNode and self.__label == right.label
-    
-    def __repr__(self): return "FlattenedNode(%s)" % repr(self.__label)
-    def __hash__(self): return hash("FlattenedNode") + hash(self.__label)
-    
-    def getMatchCandidateForLookAhead(self): return self.__mc4la
-            
 class Node(TorqExpression, EnsuredAcceptSingleNode):
-    ''' Node expression matches to a length-1 sequence of a node whose label is the same to the internal label.
+    ''' Node expression matches to a length-1 sequence of a node 
+        whose label is the same to the internal label.
     '''
     
     __slots__ = [ '__label', '__mc4la' ]
@@ -123,17 +102,11 @@ class Node(TorqExpression, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("Node") + hash(self.__label)
     
     def getMatchCandidateForLookAhead(self): return self.__mc4la
-            
-    def or_merged(self, other):
-        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
-            return NodeClass.merged([ self, other ])
-        return None
 
 _anyNodeMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM)
 
 class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
-    ''' Node expression matches to a length-1 sequence of a node.
-    '''
+    ''' Node expression matches to a length-1 sequence of a node. '''
     
     __slots__ = [ ]
         
@@ -144,11 +117,6 @@ class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("AnyNode")
     
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
-            
-    def or_merged(self, other):
-        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
-            return NodeClass.merged([ self, other ])
-        return None
     
 class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
@@ -245,59 +213,10 @@ class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
     def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
 
-class NodeClass(TorqExpression, EnsuredAcceptSingleNode):
-    ''' NodeMatch expression matches to a length-1 sequence of a node whose
-        label is the same to one of the internal labels.
-    '''
-    
-    __slots__ = [ '__labels', '__mc4la' ]
-    
-    def getlabels(self): return sorted(self.__labels)
-    labels = property(getlabels)
-    
-    def extract_labels(self): return sorted(self.__labels)
-    
-    def __init__(self, labels):
-        self.__labels = frozenset(labels)
-        self.__mc4la = MatchCandidateForLookAhead(nodes=sorted(self.__labels))
-        
-    def _match_node(self, inpSeq, inpPos, lookAheadNode):
-        if lookAheadNode[0] in self.__labels:
-            return 1, [ lookAheadNode ]
-        #return None
-    
-    def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is NodeClass and self.__labels == right.__labels
-    
-    def __repr__(self): return "NodeClass([%s])" % ",".join(repr(lbl) for lbl in sorted(self.__labels))
-    def __hash__(self): return hash("NodeClass") + sum(map(hash, self.__labels))
-    
-    def getMatchCandidateForLookAhead(self): return self.__mc4la
-            
-    def or_merged(self, other):
-        if other.__class__ is Node or other.__class__ is NodeClass or other.__class__ is AnyNode:
-            return NodeClass.merged([ self, other ])
-        return None
-
-    @staticmethod
-    def merged(nodeExprOrNodeClasss):
-        if not nodeExprOrNodeClasss: return None
-        
-        labelSet = set()
-        for item in nodeExprOrNodeClasss:
-            if item.__class__ is AnyNode:
-                return AnyNode()
-            if item.__class__ is Node:
-                labelSet.add(item.label)
-            elif item.__class__ is NodeClass:
-                labelSet.update(item.__labels)
-        return NodeClass(labelSet)
-
 _insertingMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, emptyseq=True)
 
 class InsertNode(TorqExpression):
-    ''' InsertNode(label) is equivalent to BuildToNode(label, Epsilon()).
-    '''
+    ''' InsertNode(label) is equivalent to BuildToNode(label, Epsilon()). '''
     
     __slots__ = [ '__newLabel' ]
     

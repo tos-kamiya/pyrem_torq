@@ -14,17 +14,23 @@ def inner_expr_iter(expr):
                     for v in iei_i(item): yield v # need PEP380
     return iei_i(expr)
 
-class ContainsAny:
+class _AnyItem:
     def __contains__(self, item): return True
-    def __eq__(self, right): return right.__class__ is ContainsAny
-    def __hash__(self): return hash("ContainsAny")
+    def __eq__(self, right): return right.__class__ is _AnyItem
+    def __hash__(self): return hash("_AnyItem")
     def add(self, item): pass
     def update(self, item): return self
-    def __repr__(self): return "ContainsAny()"
-ANY_ITEM = ContainsAny()
+    def __repr__(self): return "_AnyItem()"
+ANY_ITEM = _AnyItem()
 
 class MatchCandidateForLookAhead:
     __slots__ = []
+    
+    @staticmethod
+    def __normalize_items(items):
+        assert items is not None
+        assert items is ANY_ITEM or ANY_ITEM not in items
+        return ANY_ITEM if items is ANY_ITEM else frozenset(items)
     
     def __init__(self, nodes=(), literals=(), emptyseq=False):
         """ MatchCandidateForLookAhead(nodes=(), literals=(), emptyseq=False).
@@ -35,16 +41,15 @@ class MatchCandidateForLookAhead:
             emptyseq specifies an expression may match to an empty seq or not.
         """
         
-        assert nodes is not None
-        assert nodes is ANY_ITEM or ANY_ITEM not in nodes
-        self.__nodes = ANY_ITEM if nodes is ANY_ITEM else frozenset(nodes)
-
-        assert literals is not None
-        assert literals is ANY_ITEM or ANY_ITEM not in literals
-        self.__literals = ANY_ITEM if literals is ANY_ITEM else frozenset(literals)
-        
+        self.__nodes = MatchCandidateForLookAhead.__normalize_items(nodes)
+        self.__literals = MatchCandidateForLookAhead.__normalize_items(literals)
         self.__emptyseq = not not emptyseq
-    
+
+    def modified(self, nodes=None, literals=None, emptyseq=None):
+        return MatchCandidateForLookAhead(nodes=nodes if nodes is not None else self.__nodes,
+            literals=literals if literals is not None else self.__literals, 
+            emptyseq=emptyseq if emptyseq is not None else self.__emptyseq)
+ 
     def _getnodes(self): return self.__nodes
     def _getliterals(self): return self.__literals
     def _getemptyseq(self): return self.__emptyseq
@@ -134,7 +139,11 @@ class TorqExpression(object):
     _match_lit = _match_eon = _match_node
     
     def getMatchCandidateForLookAhead(self):
-        # return a MatchCandidateForLookAhead object or None
+        ''' Returns the possible first items that self matches.
+            If such items are unknown, returns None.
+            e.g. Literal('a').getMatchCandidateForLookAhead() 
+            -> MatchCandidateForLookAhead(nodes=(), literals=('a',), emptyseq=False).
+        '''
         return None 
     
     def updateMatchCandidateForLookAhead(self): pass
@@ -144,27 +153,15 @@ class TorqExpression(object):
         return list(self.extract_exprs()) if hasattr(self, "extract_exprs") else []
     
     def _eq_i(self, right, alreadyComparedExprs):
-        selfId = id(self)
-        
-        rightIdWhenSelfIsFoundInComparedExprs = alreadyComparedExprs.get(selfId, None)
-        if rightIdWhenSelfIsFoundInComparedExprs is not None:
-            return id(right) == rightIdWhenSelfIsFoundInComparedExprs
-        rightId = id(right)
-
-        alreadyComparedExprs[selfId] = rightId
-        if isinstance(right, self.__class__):
-            ex = TorqExpression.__call_extract_exprs_if_having
-            for es, er in zip(ex(self), ex(right)):
-                if not es._eq_i(er, alreadyComparedExprs):
-                    return False
-            else:
-                return True
-        return False
+        if self.__class__ is not right.__class__: return False
+        ex = TorqExpression.__call_extract_exprs_if_having
+        return all(es._eq_i(er, alreadyComparedExprs) for es, er in zip(ex(self), ex(right)))
     
-    def __eq__(self, right): return self._eq_i(right, dict())
+    def __eq__(self, right): return self._eq_i(right, set())
     
     def __repr__(self): 
-        return "%s(%s)" % ( self.__class__.__name__, ",".join(map(repr, TorqExpression.__call_extract_exprs_if_having(self))) )
+        return "%s(%s)" % ( self.__class__.__name__, 
+                ",".join(map(repr, TorqExpression.__call_extract_exprs_if_having(self))) )
         
     def __hash__(self):
         return hash(self.__class__.__name__) + sum(hash(e) for e in TorqExpression.__call_extract_exprs_if_having(self))
@@ -200,19 +197,21 @@ class TorqExpressionSingleton(TorqExpression):
         return right.__class__ == self.__class__
 
 def _target_expr_flatener(exprs, targetExprClz):
+    r = []
     for e in exprs:
         if e.__class__ is targetExprClz:
-            for i in _target_expr_flatener(e.exprs, targetExprClz): yield i # need PEP380
-        else: yield e
+            r.extend(_target_expr_flatener(e.exprs, targetExprClz))
+        else:
+            r.append(e)
+    return r
 
 class Or(TorqExpression):
-    ''' Or expression matches a sequence, iff the sequence is matched by one of the internal expressions.
-    '''
+    ''' Or expression matches a sequence, iff the sequence is matched by one of the internal expressions. '''
     
     __slots__ = [ '__exprs', '__ntbl_get', '__unknown_nlst', '__ltbl_get', '__unknown_llst', '__elst', '__mc4la' ]
     
     def __init__(self, *exprs):
-        self._set_exprs(exprs)
+        self._set_exprs(_target_expr_flatener(exprs, Or))
     
     def getexprs(self): return self.__exprs
     exprs = property(getexprs)
@@ -308,8 +307,10 @@ class Or(TorqExpression):
                 return True
     
 class Seq(TorqExpression):
-    ''' Seq expression matches a sequence, iff the sequence is a concatenation of the sequences, s1, s2, ...
-    Here sequence s1 is matched by the 1st internal expression, s2 by 2nd, and so on.
+    ''' Seq expression matches a sequence, iff the sequence is a 
+        concatenation of the sequences, s1, s2, ...
+        Here sequence s1 is matched by the 1st internal expression, 
+        s2 by 2nd, and so on.
     '''
     
     __slots__ = [ '__exprs', '__expr0', '__mc4la', ]
@@ -326,7 +327,7 @@ class Seq(TorqExpression):
     def extract_exprs(self): return list(self.__exprs)
         
     def __init__(self, *exprs):
-        self._set_exprs(exprs)
+        self._set_exprs(_target_expr_flatener(exprs, Seq))
         
     def updateMatchCandidateForLookAhead(self):
         for expr in self.__exprs:
@@ -434,10 +435,7 @@ class Repeat(TorqExpressionWithExpr):
         self.expr.updateMatchCandidateForLookAhead()
         mc4la = self.expr.getMatchCandidateForLookAhead()
         self.__mc4la = None if mc4la is None else \
-                MatchCandidateForLookAhead(
-                        nodes=mc4la.nodes, 
-                        literals=mc4la.literals, 
-                        emptyseq=self.__lowerLimit == 0 or mc4la.emptyseq)
+                mc4la.modified(emptyseq=self.__lowerLimit == 0 or mc4la.emptyseq)
         
     def _match_node(self, inpSeq, inpPos, lookAhead):
         len_inpSeq = len(inpSeq)
@@ -538,10 +536,7 @@ def _toPred(laSet):
     else: return laSet.__contains__
 
 class Search(TorqExpressionWithExpr):
-    ''' Search(expr) is almost identical to Repeat(Or(expr, Any()), 0, None).
-        The difference is: when expr matches an empty sequence at some position of inpSeq,
-        the former matches the entire input sequence. the latter matches the empty sequence.
-    '''
+    ''' Search(expr) is identical to Repeat(Or(expr, Any()), 0, None). '''
     
     __slots__ = [ '__nodeLAPred', '__literalLAPred' ]
     
@@ -553,7 +548,7 @@ class Search(TorqExpressionWithExpr):
         exprMc4la = self.expr.getMatchCandidateForLookAhead()
         if exprMc4la is None:
             self.__nodeLAPred = \
-					self.__literalLAPred = lambda la: True
+                    self.__literalLAPred = lambda la: True
         else:
             self.__nodeLAPred = _toPred(exprMc4la.nodes)
             self.__literalLAPred = _toPred(exprMc4la.literals)
@@ -645,38 +640,22 @@ class ErrorExpr(TorqExpression):
 _emptyMc4la = MatchCandidateForLookAhead(emptyseq=True)
 
 class Epsilon(TorqExpressionSingleton):
-    ''' Epsilon expression matches any zero-length sequence.
-    '''
+    ''' Epsilon expression matches any zero-length sequence. '''
     __slots__ = [ ]
-    
     def _match_node(self, inpSeq, inpPos, lookAhead): return _zeroLengthReturnValue
     _match_lit = _match_eon = _match_node
-
     def getMatchCandidateForLookAhead(self): return _emptyMc4la
 
-    def seq_merged(self, other): return other
-    def or_merged(self, other): return self
-
 class Any(TorqExpressionSingleton):
-    ''' Any expression matches any length-1 sequence.
-    '''
-    
+    ''' Any expression matches any length-1 sequence. '''
     __slots__ = [ ]
-
     def _match_node(self, inpSeq, inpPos, lookAhead): return 1, [ inpSeq[inpPos] ]
     def _match_lit(self, inpSeq, inpPos, lookAheadString): return 2, lookAheadString
-    
     def getMatchCandidateForLookAhead(self): return _anyMc4la
     
 class Never(TorqExpressionSingleton):
-    ''' Never expression does not match any sequence.
-    '''
-    
+    ''' Never expression does not match any sequence. '''
     __slots__ = [ ]
-    
     def _match_node(self, inpSeq, inpPos, lookAhead): return None
     _match_lit = _match_eon = _match_node
-    
-    def seq_merged(self, other): return self
-    def or_merged(self, other): return other
     

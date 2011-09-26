@@ -1,12 +1,12 @@
 from base_expression import *
-from literal_expression import Literal, LiteralClass
-from node_expression import Node, NodeClass
+from literal_expression import Literal #, LiteralClass
+from node_expression import Node #, NodeClass
 
 _zeroLengthReturnValue = 0, ()
 
 class Require(TorqExpressionWithExpr):
     ''' Require expression matches to a sequence which the internal expression matches.
-       When matches, do nothing to the input sequence, the output sequence.
+        When matches, do nothing to the input sequence, the output sequence.
     '''
     
     __slots__ = [ ]
@@ -25,21 +25,6 @@ class Require(TorqExpressionWithExpr):
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
     def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
-            
-    def seq_merged(self, other):
-        if self.expr.__class__ is Literal or self.expr.__class__ is LiteralClass or self.expr.__class__ is Node or self.expr.__class__ is NodeClass:
-            rs = self.getMatchCandidateForLookAhead()
-            ro = other.getMatchCandidateForLookAhead()
-            if rs is None or ro is None: return None
-            
-            selfAcceptsEmpty = not not rs.emptyseq
-            otherAcceptsEmpty = not not ro.emptyseq
-            if selfAcceptsEmpty >= otherAcceptsEmpty and \
-                    set(rs.nodes).issuperset(set(ro.nodes)) and \
-                    set(rs.literals).issuperset(set(ro.literals)):
-                # in this case, self's requirement is equivalent or superset to other's requirement.
-                # so self will not do filter out other than other does.
-                return other
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         if self is target:
@@ -68,10 +53,6 @@ class RequireBut(TorqExpressionWithExpr):
     
     def _match_eon(self, inpSeq, inpPos, lookAheadDummy):
         if self._expr._match_eon(inpSeq, inpPos, lookAheadDummy) is None: return _zeroLengthReturnValue
-    
-    def seq_merged(self, right):
-        if right.__class__ is Any:
-            return AnyBut(self.expr) 
 
     def getMatchCandidateForLookAhead(self): 
         return MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, 
@@ -121,8 +102,7 @@ class BeginOfNode(TorqExpressionSingleton):
 _atLeastOneItemMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM)
 
 class AnyBut(TorqExpressionWithExpr):
-    ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()).
-    '''
+    ''' AnyBut(expr) is equal to Seq(RequireBut(expr), Any()). '''
     
     __slots__ = [ ]
     

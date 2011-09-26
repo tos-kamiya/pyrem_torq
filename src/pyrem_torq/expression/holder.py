@@ -1,35 +1,42 @@
 from base_expression import TorqExpression, InterpretError, LeftRecursionUndecided
 
 class _UninterpretableNode(TorqExpression):
-    __slots__ = [ '__expr' ]
+    __slots__ = [ '__raise_error' ]
     
-    def __init__(self, expr):
-        self.__expr = expr
+    def __init__(self, raise_error):
+        self.__raise_error = raise_error
     
-    def _match_node(self, inpSeq, inpPos, lookAheadNode): self.expr.__raise_error(inpPos)
+    def _match_node(self, inpSeq, inpPos, lookAheadNode): self.__raise_error(inpPos)
     _match_lit = _match_eon = _match_node
 
 class Holder(TorqExpression):
     ''' A special expression, which is used as a place holder of an expression.
-        A marker object has two properties: name and expr.
-        The name property is a label of the marker object.
-        The expr property is an internal expression of the marker object.
-        When evaluated an expression, a marker object behaves as if it were the internal expression.
+        A Holder object has two properties: name and expr.
+        The name property is a label of the object.
+        The expr property is an internal expression of the object.
+        When evaluated an expression, the object behaves as if it were the internal expression.
+        If no expr is set, 
     '''
 
     __slots__ = [ '__name', '__expr', '__mc4la' ]
     
     def __init__(self, name=None):
         self.__name = name
-        self.__expr = _UninterpretableNode(self)
+        self.__expr = _UninterpretableNode(self.__raise_error)
     
     def __repr__(self): return "Holder(name=%s)" % repr(self.__name)
     def __hash__(self): return hash("Holder") + hash(self.__name)
 
     def _eq_i(self, right, alreadyComparedExprs):
-        return right.__class__ is Holder and \
-                self.__name == right.__name and \
-                self.__expr._eq_i(right.__expr, alreadyComparedExprs)
+        if right.__class__ is not Holder: return False
+        if self.__name != right.__name: return False
+        if ( id(self), id(right), True ) in alreadyComparedExprs:
+            return True
+        alreadyComparedExprs.add(( id(self), id(right), True )) # now self and right is under comparision...
+        r = self.__expr._eq_i(right.__expr, alreadyComparedExprs)
+        if not r:
+            alreadyComparedExprs.add(( id(self), id(right), False )) # now found self doesn't equal to right
+        return r
         
     def getname(self): return self.__name
     def setname(self, name): self.__name = name

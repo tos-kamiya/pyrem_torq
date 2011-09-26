@@ -16,7 +16,7 @@ from pyrem_torq.utility import split_to_strings
 # reserved words
 # any any_node req
 
-_newLineExpr = _pte.LiteralClass(['\r', '\n', '\r\n'])
+_newLineExpr = _pte.Or(*map(_pte.Literal, ['\r', '\n', '\r\n']))
 
 def __fill(itemExpr, errorMessage):
     return [0,]*itemExpr + (_pte.EndOfNode() | _pte.ErrorExpr(errorMessage))
@@ -32,7 +32,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     BtN = _pte.BuildToNode
     IN = _pte.InsertNode
     L = _pte.Literal
-    LC = _pte.LiteralClass
+    def LC(strs): return _pte.Or(*map(_pte.Literal, strs)) #    LC = _pte.LiteralClass
     N = _pte.Node
     NM = _pte.NodeMatch
     R = _pte.Rex
@@ -283,7 +283,7 @@ def convert_literal_to_expression_object(s):
         if len(s) != 1:
             return _pte.Rex("^" + s + "$", ignoreCase=True)
         else:
-            return _pte.LiteralClass([ s.lower(), s.upper() ])
+            return _pte.Or(_pte.Literal(s.lower()), _pte.Literal(s.upper()))
     else:
         return _pte.Literal(__unescape(s))
 

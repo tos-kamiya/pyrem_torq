@@ -5,7 +5,7 @@ from pyrem_torq.treeseq import seq_split_nodes_of_label
 
 BtN = BuildToNode
 L = Literal
-LC = LiteralClass
+def LC(strs): return Or(*map(Literal, strs))
 NM = NodeMatch
 
 def tokenize(text):

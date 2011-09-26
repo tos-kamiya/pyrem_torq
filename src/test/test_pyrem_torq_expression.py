@@ -4,6 +4,7 @@ Created on 2009/07/17
 @author: kamiya
 '''
 import sys, os
+import itertools
 import unittest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -110,24 +111,24 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(posDelta, 2)
         self.assertEqual(outSeq, [ 0, 'a' ])
         
-    def testLiteralClass(self):
-        expr = LiteralClass(("a", "b", "c"))
-        seq = [ 'text', 0, 'a' ]
-        
-        posDelta, outSeq = expr.match(seq, 1)
-        self.assertEqual(posDelta, 2)
-        self.assertEqual(outSeq, [ 0, 'a' ])
-        
-        seq = [ 'text', 0, 'b' ]
-        
-        posDelta, outSeq = expr.match(seq, 1)
-        self.assertEqual(posDelta, 2)
-        self.assertEqual(outSeq, [ 0, 'b' ])
-
-        seq = [ 'text', 0, 'p' ]
-        
-        posDelta, outSeq = expr.match(seq, 1)
-        self.assertEqual(posDelta, 0)
+#    def testLiteralClass(self):
+#        expr = LiteralClass(("a", "b", "c"))
+#        seq = [ 'text', 0, 'a' ]
+#        
+#        posDelta, outSeq = expr.match(seq, 1)
+#        self.assertEqual(posDelta, 2)
+#        self.assertEqual(outSeq, [ 0, 'a' ])
+#        
+#        seq = [ 'text', 0, 'b' ]
+#        
+#        posDelta, outSeq = expr.match(seq, 1)
+#        self.assertEqual(posDelta, 2)
+#        self.assertEqual(outSeq, [ 0, 'b' ])
+#
+#        seq = [ 'text', 0, 'p' ]
+#        
+#        posDelta, outSeq = expr.match(seq, 1)
+#        self.assertEqual(posDelta, 0)
         
     def testRex(self):
         expr = Rex(r"^[a-c]$")
@@ -153,19 +154,14 @@ class TestTorqExpression(unittest.TestCase):
         self.assertNotEqual(expr1_2, Literal("fuga"))
     
     def testSelection(self):
-        expr1 = LiteralClass(("u", "p"))
-        expr2 = LiteralClass(("d", "o", "w", "n"))
-        expr1_2 = expr1 | expr2
-        self.assertNotEqual(expr1_2, LiteralClass(("u", "p", "d", "o", "w", "n")))
+        exprs = map(Literal, [ "a", "b", "c" ])
+        expr = exprs[0] | exprs[1] | exprs[2]
+        self.assertEqual(expr, Or(Literal("a"), Literal("b"), Literal("c")))
         
     def testConcatLiteal(self):
-        expr1 = Literal("a")
-        expr2 = Literal("b")
-        expr1or2 = expr1 | expr2
-        self.assertNotEqual(expr1or2, LiteralClass([ "a", "b" ]))
-        
-        expr1plus2 = expr1 + expr2
-        self.assertNotEqual(expr1plus2, Seq(Literal("a"), Literal("b")))
+        exprs = map(Literal, [ "a", "b", "c" ])
+        expr = exprs[0] + exprs[1] + exprs[2]
+        self.assertEqual(expr, Seq(Literal("a"), Literal("b"), Literal("c")))
         
     def testIdentifier(self):
         idExpr = Literal('_') + [0,]*(Literal('_') | \
@@ -353,9 +349,9 @@ class TestTorqExpression(unittest.TestCase):
             self.assertTrue(hasattr(ne, "label"))
             self.assertTrue(hasattr(ne, "extract_labels"))
         
-        nodeClassExpr = NodeClass(['a', 'b', 'c'])
-        self.assertTrue(hasattr(nodeClassExpr, "labels"))
-        self.assertTrue(hasattr(nodeClassExpr, "extract_labels"))
+#        nodeClassExpr = NodeClass(['a', 'b', 'c'])
+#        self.assertTrue(hasattr(nodeClassExpr, "labels"))
+#        self.assertTrue(hasattr(nodeClassExpr, "extract_labels"))
             
         newLabelExprs = [ Relabeled('newa', Node('a')), InsertNode('a'), BuildToNode('a', Epsilon()) ]
         for nle in newLabelExprs:
@@ -369,6 +365,53 @@ class TestTorqExpression(unittest.TestCase):
                 ( [], [ 'a', 'b' ], False ))
         self.assertEqual(mc4la_to_readable(h.getMatchCandidateForLookAhead()), 
                 ( [], [ 'a', 'b' ], False ))
+    
+    def testEquality(self):
+        ea = Literal('a')
+        eb = Literal('b')
+        self.assertEqual(ea, ea)
+        self.assertNotEqual(ea, eb)
+        
+        exprs = [ Or(ea, ea), Or(ea, eb), Or(eb, ea), 
+                Seq(ea, ea), Seq(ea, eb), Seq(eb, ea),
+                Repeat(ea, 0, 1), Repeat(eb, 0, 1), Repeat(ea, 0, 2),
+                Epsilon(), Any(), Never() ]
+        for e, f in itertools.combinations(exprs, 2):
+            if e is f:
+                self.assertEqual(e, f)
+            else:
+                self.assertNotEqual(e, f)
+    
+    def testEqualityWithRecursion(self):
+        h = Holder()
+        ea = Or(Literal('a'), Seq(Literal('b'), h))
+        h2 = Holder()
+        ea2 = Or(Literal('a'), Seq(Literal('b'), h2))
+        h3 = Holder()
+        ea3 = Or(Literal('a'), Seq(Literal('a'), h3))
+        
+        self.assertEqual(h, h2)
+        self.assertNotEqual(h, h3)
+        
+        h.expr = ea
+        
+        self.assertNotEqual(h, h2)
+        
+        h2.expr = ea2
+        h3.expr = ea3
+        
+        self.assertEqual(h, h2)
+        self.assertNotEqual(h, h3)
+        
+    def testEqualityOfSearchAndRepeat(self):
+        s = Search(Literal('a'))
+        r = Repeat(Or(Literal('a'), Any()), 0, None)
+        
+        seq = [ 'code', 0, 'a', 1, 'a', 2, 'a' ]
+        sd, outSeq = s.match(seq, 1)
+        self.assertEqual(sd, 6)
+        rd, outSeq = s.match(seq, 1)
+        self.assertEqual(sd, 6)
 
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)

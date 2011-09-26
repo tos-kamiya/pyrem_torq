@@ -1,8 +1,3 @@
-'''
-Created on 2011/09/15
-
-@author: toshihiro
-'''
 import sys, os
 import unittest
 
