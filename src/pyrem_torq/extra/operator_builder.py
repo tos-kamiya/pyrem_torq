@@ -34,6 +34,13 @@ class OperatorBuilder(object):
         terms.extend(NodeMatch(lbl, Search(expr0)) for lbl in self.__ctnls)
         return Or(*terms)
     
+    def build_atom_to_term_expr(self):
+        assert self.__ate and self.__ctnls and self.__gtl
+        
+        expr0 = Holder()
+        expr0.expr = BuildToNode(self.__gtl, self.__ate) | Or(*[NodeMatch(lbl, Search(expr0)) for lbl in self.__ctnls])
+        return Search(expr0)
+    
     def build_Ot_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
         
@@ -66,8 +73,14 @@ class OperatorBuilder(object):
         expr0.expr = expr | (termExpr + whereShouldNotBeRegardedAsOperator)
         return Search(expr0)
     
-    def build_tO_expr(self, *ops):
+    def build_tO_expr(self, *ops, **kwargs):
         assert self.__ate and self.__ctnls and self.__gtl
+        pseudoPrefix = None
+        for k, v in kwargs.iteritems():
+            if k == 'pseudoPrefix':
+                pseudoPrefix = v
+            else:
+                raise TypeError("build_tO_expr() got an unexpected keyword argument: %s" % k)
         
         repeatLikeExprs = [] # \d+
         callLikeExprs = [] # f(1, 2)
@@ -93,12 +106,21 @@ class OperatorBuilder(object):
             e = op + whereTermShouldNotAppear
             voExprs.append(e)
         
-        expr = BuildToNode(self.__gtl, termExpr + [1,None] * Or(*voExprs))
+        e = termExpr + [1,None] * Or(*voExprs)
+        if pseudoPrefix:
+            e = InsertNode(pseudoPrefix) + e
+        expr = BuildToNode(self.__gtl, e)
         expr0.expr = expr | termExpr
         return Search(expr0)
     
-    def build_tOt_expr(self, *ops):
+    def build_tOt_expr(self, *ops, **kwargs):
         assert self.__ate and self.__ctnls and self.__gtl
+        pseudoPrefix = None
+        for k, v in kwargs.iteritems():
+            if k == 'pseudoPrefix':
+                pseudoPrefix = v
+            else:
+                raise TypeError("build_tOt_expr() got an unexpected keyword argument: %s" % k)
         
         addLikeExprs = [] # 1 + 2
         conditionLikeExprs = [] # flag ? 1 : 0
@@ -119,7 +141,10 @@ class OperatorBuilder(object):
             vowExprs.append(e)
         vowExprs.extend(addLikeExprs)
         
-        expr = BuildToNode(self.__gtl, termExpr + [1,None] * (Or(*vowExprs) + termExpr))
+        e = termExpr + [1,None] * (Or(*vowExprs) + termExpr)
+        if pseudoPrefix:
+            e = InsertNode(pseudoPrefix) + e
+        expr = BuildToNode(self.__gtl, e)
         expr0.expr = expr | termExpr
         return Search(expr0)
     
@@ -140,7 +165,8 @@ class OperatorBuilder(object):
 
 if __name__ == '__main__':
     import re
-    from pyrem_torq.treeseq import seq_pretty
+    from pyrem_torq.treeseq import seq_pretty, seq_remove_strattrs
+    from pyrem_torq.utility import split_to_strings
     
     kit = OperatorBuilder()
     kit.atomic_term_expr = Rex(r"^\d") | Rex(r"^\w")
@@ -148,18 +174,18 @@ if __name__ == '__main__':
     kit.generated_term_label = "t"
     
     descAndExprs = []
-    descAndExprs.append(( "funcCallExpr", kit.build_tO_expr(( Literal("("), Literal(")") )) ))
-    descAndExprs.append(( "parenExpr", kit.build_O_expr(( Literal("("), Literal(")") )) ))
+    #descAndExprs.append(( "atomicExpr", kit.build_atom_to_term_expr() ))
+    descAndExprs.append(( "funcCallExpr", kit.build_tO_expr(( BuildToNode("CL", Literal("(")), BuildToNode("CR", Literal(")")) ), pseudoPrefix="TO") ))
+    descAndExprs.append(( "parenExpr", kit.build_O_expr(( BuildToNode("PL", Literal("(")), BuildToNode("PR", Literal(")")) )) ))
     descAndExprs.append(( "indexExpr", kit.build_tO_expr(( Literal("["), Literal("]") )) ))
     descAndExprs.append(( "unaryMinusExpr", kit.build_Ot_expr(Literal("-")) ))
     descAndExprs.append(( "binaryStarExpr", kit.build_tOt_expr(Literal("*")) ))
     descAndExprs.append(( "binaryMinusExpr", kit.build_tOt_expr(Literal("-")) ))
-    descAndExprs.append(( "conditionExpr", kit.build_tOt_expr(( Literal("?"), Literal(":") )) ))
+    descAndExprs.append(( "conditionExpr", kit.build_tOt_expr(( Literal("?"), Literal(":") ), pseudoPrefix="TOT") ))
     
-    text = "-1-2*(3-4)-a[5]*6?7:8-9?b(c,d):e"
-    seq = [ 'code' ] + [m.group() for m in re.finditer(r"[a-z]+|(\d|[.])+|[-+*/%()?:,]|\[|\]", text)]
+    text = "-1-2*(3-4)-a[5]*6?7:8-9?b(c-1,d):e"
+    seq = [ 'code' ] + split_to_strings(text, re.compile(r"[a-z]+|(\d|[.])+|[-+*/%()?:,]|\[|\]"))
     for desc, expr in descAndExprs:
         print "step: %s" % desc
         seq = expr.parse(seq)
-        assert True
-        for L in seq_pretty(seq): print L
+        for L in seq_pretty(seq_remove_strattrs(seq)): print L
