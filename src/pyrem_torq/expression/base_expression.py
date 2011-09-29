@@ -126,8 +126,7 @@ class TorqExpression(object):
     def parse(self, inpSeq):
         ''' Do matching of the expression and input sequence.
             If the entire inpSeq is matched by the expression (self),
-            returns list of output nodes.
-            Otherwise, returns None.
+            returns list of output nodes. Otherwise, returns None.
         '''
         
         p, o = self.match(inpSeq, 1)

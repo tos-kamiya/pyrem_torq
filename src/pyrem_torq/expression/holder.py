@@ -15,7 +15,7 @@ class Holder(TorqExpression):
         The name property is a label of the object.
         The expr property is an internal expression of the object.
         When evaluated an expression, the object behaves as if it were the internal expression.
-        If no expr is set, 
+        If no internal expression is set, the object raises InterpreterError.
     '''
 
     __slots__ = [ '__name', '__expr', '__mc4la' ]

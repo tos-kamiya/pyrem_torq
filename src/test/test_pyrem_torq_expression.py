@@ -412,7 +412,42 @@ class TestTorqExpression(unittest.TestCase):
         self.assertEqual(sd, 6)
         rd, outSeq = s.match(seq, 1)
         self.assertEqual(sd, 6)
+        
+    def testSubapply(self):
+        def capitalize(seq):
+            assert len(seq) == 2
+            return seq[0], seq[1].upper()
+        
+        expr = Search(SubApply(capitalize, Rex('^[a-z]')))
+        seq = [ 'code', 0, 'a', 1, 'b', 2, 'c', 3, 'Abc', 6, 'dEF' ]
+        outSeq = expr.parse(seq)
+        self.assertEqual(outSeq, [ 'code', 0, 'A', 1, 'B', 2, 'C', 3, 'Abc', 6, 'DEF' ])
 
+    def testSubapply2(self):
+        def removeNodeB(seq):
+            assert len(seq) == 1
+            node = seq[0]
+            if node[0] == 'b': 
+                return []
+            else:
+                return seq
+            
+        expr = Search(SubApply(removeNodeB, AnyNode()))
+        seq = [ 'code', [ 'a' ], [ 'b' ], [ 'c' ] ]
+        outSeq = expr.parse(seq)
+        self.assertEqual(outSeq, [ 'code', [ 'a' ], [ 'c' ] ])
+
+        def failNodeB(seq):
+            assert len(seq) == 1
+            node = seq[0]
+            if node[0] == 'b': 
+                return None
+            else:
+                return seq
+        expr = Repeat(SubApply(failNodeB, AnyNode()), 0, None)
+        seq = [ 'code', [ 'a' ], [ 'b' ], [ 'c' ] ]
+        self.assertEqual(expr.parse(seq), None)
+        
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)
 

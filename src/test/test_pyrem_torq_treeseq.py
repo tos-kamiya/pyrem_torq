@@ -58,10 +58,9 @@ class TestTorqTreeseq(unittest.TestCase):
         self.assertEquals(atrSeq, [ 'a', [ 'B', 1 ], 2 ])
         mergedSeq = seq_merge_strattrs(atrSeq, strSeq)
         self.assertEquals(mergedSeq, seq)
- 
          
-def TestSuite(TestTorqExpression):
-    return unittest.makeSuite(TestTorqTreeseq)
+#def TestSuite(TestTorqTreeseq):
+#    return unittest.makeSuite(TestTorqTreeseq)
 
 if __name__ == '__main__':
     unittest.main()

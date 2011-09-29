@@ -11,7 +11,7 @@ packages = [
 
 setup(
     name = 'pyrem_torq',
-    version = '0.4',
+    version = '0.5',
     packages = packages,
     package_dir = dict((p, "src/" + p.replace(".", "/")) for p in packages)
 )
