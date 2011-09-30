@@ -58,6 +58,12 @@ class Holder(TorqExpression):
     
     def extract_exprs(self): return [ self.__expr ]
 
+    def extract_labels(self): 
+        return self.__expr.extract_labels() if hasattr(self.__expr, "extract_labels") else []
+    
+    def extract_new_labels(self):
+        return self.__expr.extract_new_labels() if hasattr(self.__expr, "extract_new_labels") else []
+    
     def updateMatchCandidateForLookAhead(self):
         if not isinstance(self.__expr, _UninterpretableNode):
             self.__mc4la = self.__expr.getMatchCandidateForLookAhead()

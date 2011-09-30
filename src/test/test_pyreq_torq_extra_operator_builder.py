@@ -67,6 +67,28 @@ class TestTorqOperatorBuilder(unittest.TestCase):
             sys.stdout.write("\n".join(seq_pretty(seq_wo_attr)) + "\n")
             self.assertEquals(seq_wo_attr, result)
     
+    def testParseExpressionWithGerbageToken(self):
+        kit = OperatorBuilder()
+        kit.atomic_term_expr = Rex(r"^\d")
+        kit.composed_term_node_labels = ( "t", )
+        kit.generated_term_label = "t"
+        
+        descAndExprs = []
+        descAndExprs.append(( "atomicExpr", kit.build_atom_to_term_expr() ))
+        descAndExprs.append(( "funcCallExpr", kit.build_tO_expr(( BuildToNode("CL", Literal("(")), BuildToNode("CR", Literal(")")) ), pseudoPrefix="TO") ))
+        descAndExprs.append(( "parenExpr", kit.build_O_expr(( BuildToNode("PL", Literal("(")), BuildToNode("PR", Literal(")")) )) ))
+        descAndExprs.append(( "unaryMinusExpr", kit.build_Ot_expr(Literal("-")) ))
+        descAndExprs.append(( "binaryStarExpr", kit.build_tOt_expr(Literal("*")) ))
+        descAndExprs.append(( "binaryMinusExpr", kit.build_tOt_expr(Literal("-")) ))
+    
+        text = "-1-2*(3-gerbage)-4"
+        seq = [ 'code' ] + split_to_strings(text, re.compile(r"[a-z]+|(\d|[.])+|[-+*/%()?:,]|\[|\]"))
+        for desc, expr in descAndExprs:
+            #print "step: %s" % desc
+            seq = expr.parse(seq)
+            seq_wo_attr = seq_remove_strattrs(seq)
+            #sys.stdout.write("\n".join(seq_pretty(seq_wo_attr)) + "\n")
+
     def testParseExpressionInStatement(self):
         kit = OperatorBuilder()
         kit.atomic_term_expr = Rex(r"^\d")

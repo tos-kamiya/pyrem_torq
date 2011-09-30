@@ -4,11 +4,22 @@ class SubApply(TorqExpressionWithExpr):
     ''' Applies a given (Python) function to a (sub-)sequence, to which a given expr matches. 
         In the result of parsing, the sub-sequence is replaced with a return value of the function.
     '''
-    __slots__ = [ '__func' ]
+    __slots__ = [ '__func', '__labels', '__newLabels' ]
     
-    def __init__(self, func, expr):
+    def __init__(self, func, expr, new_labels=None, labels=None):
         self.__func = func
         self._set_expr(expr)
+        referringLabels = []
+        if hasattr(expr, "extract_labels"): referringLabels.extend(expr.extract_labels())
+        if labels: referringLabels.extend(labels)
+        self.__labels = tuple(sorted(referringLabels))
+        newLabels = []
+        if hasattr(expr, "extract_new_labels"): newLabels.extend(expr.extract_new_labels())
+        if new_labels: newLabels.extend(new_labels)
+        self.__newLabels = tuple(sorted(newLabels))
+        
+    def extract_labels(self): return list(self.__labels)
+    def extract_new_labels(self): return list(self.__newLabels)
     
     def __modify_output(self, r):
         if r is not None:
