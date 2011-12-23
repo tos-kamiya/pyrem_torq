@@ -448,6 +448,28 @@ class TestTorqExpression(unittest.TestCase):
         seq = [ 'code', [ 'a' ], [ 'b' ], [ 'c' ] ]
         self.assertEqual(expr.parse(seq), None)
         
+    def testJoin(self):
+        expr = Join(Node('comma'), Node('hoge'), 2, 2)
+        seq = [ 'text', [ 'hoge' ], [ 'comma' ], [ 'hoge' ] ]
+        
+        posDelta, outSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 3)
+        self.assertEqual(outSeq, [ [ 'hoge' ], [ 'comma' ], [ 'hoge' ] ])
+        
+        expr = Join(Node('comma'), InsertNode('hoge'), 3, 3) + Literal('a')
+        seq = [ 'text', [ 'comma' ], [ 'comma' ], 0, 'a' ]
+        
+        posDelta, outSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 4)
+        self.assertEqual(outSeq, [ [ 'hoge' ], [ 'comma' ], [ 'hoge' ], [ 'comma' ], [ 'hoge' ], 0, 'a' ])
+        
+        expr = Join(InsertNode('comma'), InsertNode('hoge'), 3, 3)
+        seq = [ 'text' ]
+        
+        posDelta, outSeq = expr.match(seq, 1)
+        self.assertEqual(posDelta, 0)
+        self.assertEqual(outSeq, [ [ 'hoge' ], [ 'comma' ], [ 'hoge' ], [ 'comma' ], [ 'hoge' ] ])
+        
 def TestSuite(TestTorqExpression):
     return unittest.makeSuite(TestTorqExpression)
 

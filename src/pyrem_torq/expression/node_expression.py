@@ -20,6 +20,9 @@ class Relabeled(TorqExpressionWithExpr, NodeModifier):
     def extract_new_labels(self): 
         return [ self.__newLabel ]
     
+    def _calc_mc4la(self):
+        return self._expr.getMatchCandidateForLookAhead()
+    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
         if r is not None:
@@ -38,7 +41,7 @@ class Relabeled(TorqExpressionWithExpr, NodeModifier):
     def __hash__(self): return hash("Relabeled") + hash(self.__newLabel) + hash(self.expr)
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
@@ -54,6 +57,9 @@ class Flattened(TorqExpressionWithExpr, NodeModifier):
         assert isinstance(nodeExpr, EnsuredAcceptSingleNode)
         self._set_expr(nodeExpr)
 
+    def _calc_mc4la(self):
+        return self._expr.getMatchCandidateForLookAhead()
+    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
         if r is not None:
@@ -69,7 +75,7 @@ class Flattened(TorqExpressionWithExpr, NodeModifier):
     def __hash__(self): return hash("Flattened") + hash(self.expr)
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
     
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)
@@ -85,6 +91,8 @@ class Node(TorqExpression, EnsuredAcceptSingleNode):
     label = property(getlabel)
     
     def extract_labels(self): return [ self.__label ]
+    
+    def _calc_mc4la(self): pass
     
     def __init__(self, label):
         self.__label = label
@@ -110,6 +118,8 @@ class AnyNode(TorqExpressionSingleton, EnsuredAcceptSingleNode):
     
     __slots__ = [ ]
         
+    def _calc_mc4la(self): pass
+    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         return 1, [ lookAheadNode ]
     
@@ -126,17 +136,19 @@ class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     
     __slots__ = [ '__label', '__mc4la' ]
     
+    def __init__(self, label, expr):
+        #assert expr is not None # use Node, instead!
+        self.__label = label
+        self._set_expr(expr)
+        
     def getlabel(self): return self.__label
     label = property(getlabel)
     
     def extract_labels(self): return [ self.__label ]
     
-    def __init__(self, label, expr):
-        #assert expr is not None # use Node, instead!
-        self._set_expr(expr)
-        self.__label = label
+    def _calc_mc4la(self):
         self.__mc4la = MatchCandidateForLookAhead(nodes=( self.__label, ))
-        
+    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         #assert self.expr != None
         if lookAheadNode[0] != self.__label: 
@@ -169,7 +181,7 @@ class NodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("NodeMatch") + hash(self.expr) + hash(self.__label)
 
     def getMatchCandidateForLookAhead(self): return self.__mc4la
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
 
 class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     ''' NodeMatch expression matches to a length-1 sequence of a node iff 
@@ -182,6 +194,8 @@ class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
         
+    def _calc_mc4la(self): pass
+    
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         #assert self.expr != None
         len_node = len(lookAheadNode); assert len_node >= 1
@@ -211,7 +225,7 @@ class AnyNodeMatch(TorqExpressionWithExpr, EnsuredAcceptSingleNode):
     def __hash__(self): return hash("AnyNodeMatch") + hash(self.expr)
 
     def getMatchCandidateForLookAhead(self): return _anyNodeMc4la
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
 
 _insertingMc4la = MatchCandidateForLookAhead(nodes=ANY_ITEM, literals=ANY_ITEM, emptyseq=True)
 
@@ -220,14 +234,16 @@ class InsertNode(TorqExpression):
     
     __slots__ = [ '__newLabel' ]
     
+    def __init__(self, newLabel):
+        assert newLabel
+        self.__newLabel = newLabel
+    
     def getnewlabel(self): return self.__newLabel
     newLabel = property(getnewlabel)
     
     def extract_new_labels(self): return [ self.__newLabel ]
     
-    def __init__(self, newLabel):
-        assert newLabel
-        self.__newLabel = newLabel
+    def _calc_mc4la(self): pass
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         return 0, [ [ self.__newLabel ] ]
@@ -249,16 +265,18 @@ class BuildToNode(TorqExpressionWithExpr):
     
     __slots__ = [ '__newLabel' ]
     
-    def getnewlabel(self): return self.__newLabel
-    newLabel = property(getnewlabel)
-    
-    def extract_new_labels(self): return [ self.__newLabel ]
-    
     def __init__(self, newLabel, expr):
         #assert expr is not None # use Node, instead!
         self._set_expr(expr)
         assert newLabel
         self.__newLabel = newLabel
+    
+    def getnewlabel(self): return self.__newLabel
+    newLabel = property(getnewlabel)
+    
+    def _calc_mc4la(self): pass
+    
+    def extract_new_labels(self): return [ self.__newLabel ]
     
     def _match_node(self, inpSeq, inpPos, lookAheadNode):
         r = self._expr._match_node(inpSeq, inpPos, lookAheadNode)
@@ -286,7 +304,7 @@ class BuildToNode(TorqExpressionWithExpr):
     def __hash__(self): return hash("BuildToNode") + hash(self.__newLabel) + hash(self.expr)
 
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         id_self = id(self)

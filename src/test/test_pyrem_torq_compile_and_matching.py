@@ -195,6 +195,18 @@ int main(int argc, char *argv[])
         
         self.assertTrue(exprs[0] == BtN("lc", Flattened(N("c"))) or \
                 exprs[0] == Relabeled("lc", N("c")))
+    
+    def testJoining(self):
+        exprs = compile_exprs([ 'expr <- ","++"b";', 'expr <- ","**"b";' ])
+        assert len(exprs) == 2
+        
+        inputText = r'b,b,b'
+        seq = [ 'code' ] + split_to_strings(inputText)
+        r0 = exprs[0].parse(seq)
+        self.assertEqual(r0, [ 'code', [ 'expr', 0, 'b', 1, ',', 2, 'b', 3, ',', 4, 'b' ] ])
+        r1 = exprs[1].parse(seq)
+        self.assertEqual(r1, [ 'code', [ 'expr', 0, 'b', 1, ',', 2, 'b', 3, ',', 4, 'b' ] ])
+        
 
 if __name__ == '__main__':
     unittest.main()

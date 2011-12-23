@@ -21,6 +21,8 @@ class _AnyItem:
     def add(self, item): pass
     def update(self, item): return self
     def __repr__(self): return "_AnyItem()"
+    def __or__(self, right): return self
+    def __ror__(self, right): return self
 ANY_ITEM = _AnyItem()
 
 class MatchCandidateForLookAhead:
@@ -64,9 +66,9 @@ class MatchCandidateForLookAhead:
 
     def __repr__(self): 
         return "MatchCandiateForLookAhead(nodes=%s,literals=%s,emptyseq=%s)" % \
-            ( repr(tuple(sorted(self.__nodes))), 
-            repr(tuple(sorted(self.__literals))), 
-            repr(tuple(sorted(self.__emptyseq))) )
+            ( (repr(tuple(sorted(self.__nodes))) if self.__nodes.__class__ is not _AnyItem else "ANY_ITEM"), 
+            (repr(tuple(sorted(self.__literals)))  if self.__literals.__class__ is not _AnyItem else "ANY_ITEM"), 
+            repr(self.__emptyseq) )
         
     def __hash__(self):
         return hash("MatchCandiateForLookAhead") + sum(map(hash, _chain(self.__nodes, self.__literals, self.__emptyseq)))
@@ -180,13 +182,9 @@ class TorqExpressionWithExpr(TorqExpression):
     def _set_expr(self, expr):
         assert isinstance(expr, TorqExpression)
         self._expr = expr
-        self.updateMatchCandidateForLookAhead()
+        self._calc_mc4la()
         
-    def extract_exprs(self): 
-        try: return [ self._expr ]
-        except AttributeError, e:
-            print repr(self)
-            raise e
+    def extract_exprs(self):  return [ self._expr ]
 
 class TorqExpressionSingleton(TorqExpression):
     ''' (Abstract class.) intended to be used internally. '''
@@ -218,11 +216,14 @@ class Or(TorqExpression):
     def _set_exprs(self, exprs):
         self.__exprs = exprs
         for expr in self.__exprs: assert isinstance(expr, TorqExpression)
-        self.updateMatchCandidateForLookAhead()
-        
+        self._calc_mc4la()
+    
     def updateMatchCandidateForLookAhead(self):
         for expr in self.__exprs:
             expr.updateMatchCandidateForLookAhead()
+        self._calc_mc4la()
+    
+    def _calc_mc4la(self):
         ntbl, self.__unknown_nlst, ltbl, self.__unknown_llst, self.__elst, including_unknown_req = Or._make_tables(self.__exprs)
         if including_unknown_req:
             self.__mc4la = None
@@ -314,6 +315,9 @@ class Seq(TorqExpression):
     
     __slots__ = [ '__exprs', '__expr0', '__mc4la', ]
     
+    def __init__(self, *exprs):
+        self._set_exprs(_target_expr_flatener(exprs, Seq))
+        
     def getexprs(self): return self.__exprs
     exprs = property(getexprs)
     
@@ -321,35 +325,32 @@ class Seq(TorqExpression):
         self.__exprs = tuple(exprs)
         for expr in self.__exprs: assert isinstance(expr, TorqExpression)
         self.__expr0 = self.__exprs[0] if self.__exprs else Epsilon()
-        self.updateMatchCandidateForLookAhead()
+        self._calc_mc4la()
         
     def extract_exprs(self): return list(self.__exprs)
         
-    def __init__(self, *exprs):
-        self._set_exprs(_target_expr_flatener(exprs, Seq))
-        
-    def updateMatchCandidateForLookAhead(self):
-        for expr in self.__exprs:
-            expr.updateMatchCandidateForLookAhead()
+    def _calc_mc4la(self):
         ns, ls = set(), set()
         acceptEmpty = True
         for r in (expr.getMatchCandidateForLookAhead() for expr in self.__exprs):
             if r is None: 
                 self.__mc4la = None
                 return
-            if r.nodes is ANY_ITEM: 
-                ns = ANY_ITEM
-            else:
-                ns.update(r.nodes)
-            if r.literals is ANY_ITEM:
-                ls = ANY_ITEM
-            else:
-                ls.update(r.literals)
+            ns = ns | r.nodes
+            ls = ls | r.literals
             if not r.emptyseq:
                 acceptEmpty = False
                 break # for r
         self.__mc4la = MatchCandidateForLookAhead(
                 nodes=ns, literals=ls, emptyseq=acceptEmpty)
+    
+    def updateMatchCandidateForLookAhead(self):
+        for expr in self.__exprs:
+            expr.updateMatchCandidateForLookAhead()
+            mc4la = expr.getMatchCandidateForLookAhead()
+            if mc4la is None or not mc4la.emptyseq:
+                break # for expr
+        self._calc_mc4la()
     
     def __match_tail(self, inpSeq, inpPos, r):
         if r is None: return None
@@ -429,12 +430,15 @@ class Repeat(TorqExpressionWithExpr):
         assert upperLimit is None or upperLimit >= lowerLimit
         self.__lowerLimit, self.__upperLimit = lowerLimit, upperLimit
         self._set_expr(expr)
-
-    def updateMatchCandidateForLookAhead(self):
-        self.expr.updateMatchCandidateForLookAhead()
-        mc4la = self.expr.getMatchCandidateForLookAhead()
+    
+    def _calc_mc4la(self):
+        mc4la = self._expr.getMatchCandidateForLookAhead()
         self.__mc4la = None if mc4la is None else \
                 mc4la.modified(emptyseq=self.__lowerLimit == 0 or mc4la.emptyseq)
+    
+    def updateMatchCandidateForLookAhead(self):
+        self.expr.updateMatchCandidateForLookAhead()
+        self._calc_mc4la()
         
     def _match_node(self, inpSeq, inpPos, lookAhead):
         len_inpSeq = len(inpSeq)
@@ -486,7 +490,7 @@ class Repeat(TorqExpressionWithExpr):
     def _eq_i(self, right, alreadyComparedExprs):
         return right.__class__ is Repeat and \
                 self.__lowerLimit == right.__lowerLimit and self.__upperLimit == right.__upperLimit and \
-                self.get()._eq_i(right, alreadyComparedExprs)
+                self._expr._eq_i(right._expr, alreadyComparedExprs)
         
     def __repr__(self): 
         return "Repeat(%s,%s,%s)" % ( repr(self.expr), repr(self.__lowerLimit), repr(self.__upperLimit) )
@@ -542,8 +546,7 @@ class Search(TorqExpressionWithExpr):
     def __init__(self, expr):
         self._set_expr(expr)
     
-    def updateMatchCandidateForLookAhead(self):
-        self.expr.updateMatchCandidateForLookAhead()
+    def _calc_mc4la(self):
         exprMc4la = self.expr.getMatchCandidateForLookAhead()
         if exprMc4la is None:
             self.__nodeLAPred = \
@@ -551,6 +554,10 @@ class Search(TorqExpressionWithExpr):
         else:
             self.__nodeLAPred = _toPred(exprMc4la.nodes)
             self.__literalLAPred = _toPred(exprMc4la.literals)
+    
+    def updateMatchCandidateForLookAhead(self):
+        self.expr.updateMatchCandidateForLookAhead()
+        self._calc_mc4la()
         
     def _match_node(self, inpSeq, inpPos, lookAhead):
         len_inpSeq = len(inpSeq)

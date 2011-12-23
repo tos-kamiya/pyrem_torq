@@ -9,6 +9,7 @@ from pyrem_torq.utility import split_to_strings
 # Priority of operators
 # ()
 # + ? * [] ~ @ req req^ any^
+# ++ **
 # ,
 # |
 # <- ::
@@ -77,6 +78,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 rst("comma", ","), rst("semicolon", ";"),
                 rst("matches", ":", ":"), rst("anybut", "any", "^"), rst("reqbut", "req", "^"),
                 rst("LP", "("), rst("RP", ")"), 
+                rst("joinplus", "+", "+"), rst("joinstar", "*", "*"),
                 rst("plus", "+"), rst("ques", "?"), rst("star", "*"), rst("or", "|"), rst("diamond", "[", "]"),
                 rst("search", "~"),
                 
@@ -149,6 +151,17 @@ def parse_to_ast(inputSeq, verboseOutput=None):
         seq[:] = parseUnaryOperatorsExpr().parse(seq)
         seq[:] = seq_split_nodes_of_label(seq, "null")[0]
     
+    with verbose_print_step_title_and_result_seq('parseBinaryOperatorJoin'):
+        def parseBinaryOperatorJoinExpr():
+            joinExpr = Holder('joinExpr')
+            term = recurseApplyAndParam(joinExpr) | XtA((N('joinplus') | N('joinstar')))
+            joinExpr.expr = BtN('apply', IN('joinplus') + term + markNull(N('joinplus')) + joinExpr) \
+                | BtN('apply', IN('joinstar') + term + markNull(N('joinstar')) + joinExpr) \
+                | term
+            return __fill(joinExpr.expr, "Can't parse binary operator join (++, **)")
+        seq[:] = parseBinaryOperatorJoinExpr().parse(seq)
+        seq[:] = seq_split_nodes_of_label(seq, "null")[0]
+    
     with verbose_print_step_title_and_result_seq('parseBinaryOperatorSeq'):
         def parseBinaryOperatorSeqExpr():
             seqExpr = Holder('seqExpr')
@@ -173,13 +186,12 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     with verbose_print_step_title_and_result_seq('parseBinaryOperatorMatch'):
         def parseBinaryOperatorMatchExpr():
             matchExpr = Holder('matchExpr')
-            def aop(opName): return BtN('apply', IN(opName) + N('id') + markNull(N(opName)) + matchExpr)
             def aopwd(opName): return BtN('apply', IN(opName) + IN('expand') + markNull(N('diamond')) + N('id') + markNull(N(opName)) + matchExpr)
             term = recurseApplyAndParam(matchExpr) | XtA((N('matches') | N('assign_subtree')))
-            matchExpr.expr = aopwd('matches') | \
-                BtN('apply', IN('matches') + N('id') + markNull(N('matches')) + matchExpr) | \
-                BtN('apply', IN('insert_subtree') + (N('id') | N('null')) + markNull(N('insert_subtree')) + matchExpr) | \
-                term
+            matchExpr.expr = aopwd('matches') \
+                | BtN('apply', IN('matches') + N('id') + markNull(N('matches')) + matchExpr) \
+                | BtN('apply', IN('insert_subtree') + (N('id') | N('null')) + markNull(N('insert_subtree')) + matchExpr) \
+                | term
             return __fill(matchExpr.expr, "Can't parse binary operator match (::)")
         seq[:] = parseBinaryOperatorMatchExpr().parse(seq)
         seq[:] = seq_split_nodes_of_label(seq, "null")[0]
@@ -314,6 +326,7 @@ def _cnv_i(seq, replaceTable, literalExprPool):
     _nameToOrSeq = { 'or': _pte.Or, 'seq': _pte.Seq }
     #_nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
     _nameToBuiltinFunc = { 'req': _pte.Require, 'reqbut': _pte.RequireBut, 'anybut': _pte.AnyBut, 'search' : _pte.Search }
+    _nameToJoin = { 'joinplus': lambda s, i: _pte.Join(s, i, 2, None), 'joinstar': _pte.Join.OneOrMore }
     
     len_seq = len(seq)
     
@@ -366,6 +379,10 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             if not(len_seq >= 2): raise CompileError("Invalid Or(|)/Seq(,) expr", seq1)
             r = [ _cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
             return _nameToOrSeq[seq1[0]](*r)
+        elif seq1NodeName in _nameToJoin:
+            if len_seq != 4: raise CompileError("Invalid ++/** expr", seq1)
+            r = [ _cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
+            return _nameToJoin[seq1[0]](*r)
         else:
             assert False
     elif seq0 == "any":

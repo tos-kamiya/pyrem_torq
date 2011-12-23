@@ -23,6 +23,7 @@ class Holder(TorqExpression):
     def __init__(self, name=None):
         self.__name = name
         self.__expr = _UninterpretableNode(self.__raise_error)
+        self.__mc4la = None
     
     def __repr__(self): return "Holder(name=%s)" % repr(self.__name)
     def __hash__(self): return hash("Holder") + hash(self.__name)

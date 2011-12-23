@@ -115,6 +115,12 @@ class TestTorqComile(unittest.TestCase):
         pte = pyrem_torq.expression
         expr = compiling('null <- "a";')
         self.assertEqual(expr, pte.BuildToNode("null", pte.Literal("a")))
+    
+    def testJoin(self):
+        exprStr1 = "a++b;"
+        expr1 = compiling(exprStr1)
+        exprStr2 = "a**b;"
+        expr2 = compiling(exprStr2)
         
 if __name__ == '__main__':
     unittest.main()

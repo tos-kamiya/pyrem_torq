@@ -18,6 +18,8 @@ class SubApply(TorqExpressionWithExpr):
         if new_labels: newLabels.extend(new_labels)
         self.__newLabels = tuple(sorted(newLabels))
         
+    def _calc_mc4la(self): pass
+    
     def extract_labels(self): return list(self.__labels)
     def extract_new_labels(self): return list(self.__newLabels)
     
@@ -50,7 +52,7 @@ class SubApply(TorqExpressionWithExpr):
     def __hash__(self): return hash("SubApply") + hash(self.__func) + hash(self.expr)
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()
-    def updateMatchCandidateForLookAhead(self): return self._expr.updateMatchCandidateForLookAhead()
+    def updateMatchCandidateForLookAhead(self): self._expr.updateMatchCandidateForLookAhead()
 
     def _isLeftRecursive_i(self, target, visitedExprIdSet):
         return self.expr._isLeftRecursive_i(target, visitedExprIdSet)

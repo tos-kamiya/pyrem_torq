@@ -6,6 +6,7 @@ Known Bugs
 
 0.5 2011/09/29
   - Added a SubApply class, which apply a functions to a sequence on way of parsing.
+  - Added a Join class and binary operators ++ and **, for join-like concatenation.
 
 0.4 2011/09/20
   - Breaking change: Now pyrem_torq doesn't uses pyrem_strs.
