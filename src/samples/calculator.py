@@ -91,7 +91,7 @@ usage: calculator <expr>
     for expr in parsing_exprs:
         for L in ts.seq_pretty(ts.seq_remove_strattrs(seq)): print L # prints an seq
         newSeq = expr.parse(seq)
-        if newSeq is None: raise SystemError
+        if newSeq is None: sys.exit("Syntax Error")
         seq = newSeq
         seq = seq_split_nodes_of_label(seq, "null")[0]
     for L in ts.seq_pretty(ts.seq_remove_strattrs(seq)): print L # prints an seq

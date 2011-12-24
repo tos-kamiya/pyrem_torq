@@ -360,7 +360,7 @@ def main(debugTrace=False):
             debugWrite("\n".join(treeseq.seq_pretty(treeseq.seq_remove_strattrs(seq))) + "\n") # prints a seq
             debugWrite("step: %s\n" % desc)
             newSeq = expr.parse(seq)
-        if newSeq is None: raise SystemError("parse error")
+        if newSeq is None: sys.exit("parse error")
         seq = newSeq
         seq = seq_split_nodes_of_label(seq, "null")[0]
     if debugWrite: debugWrite("\n".join(treeseq.seq_pretty(treeseq.seq_remove_strattrs(seq))) + "\n") # prints a seq
