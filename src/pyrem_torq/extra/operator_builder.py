@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from pyrem_torq.expression import *
 
 class OperatorBuilder(object):

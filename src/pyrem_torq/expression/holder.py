@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from base_expression import TorqExpression, InterpretError, LeftRecursionUndecided
 
 class _UninterpretableNode(TorqExpression):

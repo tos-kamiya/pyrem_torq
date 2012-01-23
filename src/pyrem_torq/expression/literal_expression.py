@@ -1,3 +1,5 @@
+#coding: utf-8
+
 import re
 
 from base_expression import TorqExpression, TorqExpressionSingleton, MatchCandidateForLookAhead, ANY_ITEM

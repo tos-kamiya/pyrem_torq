@@ -1,6 +1,6 @@
+#coding: utf-8
+
 from base_expression import *
-from literal_expression import Literal #, LiteralClass
-from node_expression import Node #, NodeClass
 
 _zeroLengthReturnValue = 0, ()
 _emptyMc4la = MatchCandidateForLookAhead(emptyseq=True)

@@ -1,3 +1,5 @@
+#coding: utf-8
+
 if hasattr("123", "__int__") or hasattr(u"123", "__int__"):
     raise ImportError, "module pyrem_torq.utility assumes str type doesn't have a method __int__()"
 

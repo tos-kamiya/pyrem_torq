@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from itertools import islice
 from collections import deque
 

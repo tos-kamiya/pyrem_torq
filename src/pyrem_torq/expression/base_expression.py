@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from itertools import chain as _chain
         
 def inner_expr_iter(expr):

@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from base_expression import TorqExpressionWithExpr
 
 class SubApply(TorqExpressionWithExpr):

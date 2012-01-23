@@ -1,3 +1,5 @@
+#coding: utf-8
+
 import re
 
 _default_splitting_pattern_arguments = ( r"\d+|[a-zA-Z]+|\r\n|.", re.DOTALL )
