@@ -54,16 +54,16 @@ class OperatorBuilder(object):
     
     def build_Ot_expr(self, *ops):
         assert self.__ate and self.__ctnls and self.__gtl
-        
-        signLikeExprs = [] # -123
-        castLikeExprs = [] # (int)3.14
+
+        signLikeExprs = []  # -123
+        castLikeExprs = []  # (int)3.14
         for op in ops:
             if isinstance(op, TorqExpression):
                 signLikeExprs.append(op)
             else:
                 opOpen, opClose = op
-                castLikeExprs.append(( opOpen, opClose ))
-        
+                castLikeExprs.append((opOpen, opClose))
+
         opBeginExprs = []
         opBeginExprs.extend(signLikeExprs)
         opBeginExprs.extend(opOpen for opOpen, opClose in castLikeExprs)
@@ -76,9 +76,9 @@ class OperatorBuilder(object):
             e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             ovExprs.append(e)
         ovExprs.extend(signLikeExprs)
-        
-        whereShouldNotBeRegardedAsOperator = [0,1] * Or(*opBeginExprs)
-        expr = BuildToNode(self.__gtl, [1,None] * Or(*ovExprs) + termExpr) + whereShouldNotBeRegardedAsOperator
+
+        whereShouldNotBeRegardedAsOperator = [0, 1] * Or(*opBeginExprs)
+        expr = BuildToNode(self.__gtl, [1, None] * Or(*ovExprs) + termExpr) + whereShouldNotBeRegardedAsOperator
         # this "+ [0,1] * Or(*opBeinExprs)" is used to neglect the operator appears after some term.
         
         expr0.expr = expr | (termExpr + whereShouldNotBeRegardedAsOperator)
@@ -92,26 +92,26 @@ class OperatorBuilder(object):
                 pseudoPrefix = v
             else:
                 raise TypeError("build_tO_expr() got an unexpected keyword argument: %s" % k)
-        
-        repeatLikeExprs = [] # \d+
-        callLikeExprs = [] # f(1, 2)
+
+        repeatLikeExprs = []  # \d+
+        callLikeExprs = []  # f(1, 2)
         for op in ops:
             if isinstance(op, TorqExpression):
                 repeatLikeExprs.append(op)
             else:
                 opOpen, opClose = op
-                callLikeExprs.append(( opOpen, opClose ))
-        
+                callLikeExprs.append((opOpen, opClose))
+
         expr0 = Holder()
         termExpr = self._make_term_expr(expr0)
-        
-        terms = [ self.__ate ]
+
+        terms = [self.__ate]
         terms.extend(Node(lbl) for lbl in self.__ctnls)
         whereTermShouldNotAppear = RequireBut(Or(*terms))
         
         voExprs = []
         for opOpen, opClose in callLikeExprs:
-            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose + whereTermShouldNotAppear
+            e = opOpen + [0, None] * (RequireBut(opClose) + (expr0 | Any())) + opClose + whereTermShouldNotAppear
             voExprs.append(e)
         for op in repeatLikeExprs:
             e = op + whereTermShouldNotAppear
@@ -132,27 +132,27 @@ class OperatorBuilder(object):
                 pseudoPrefix = v
             else:
                 raise TypeError("build_tOt_expr() got an unexpected keyword argument: %s" % k)
-        
-        addLikeExprs = [] # 1 + 2
-        conditionLikeExprs = [] # flag ? 1 : 0
-        
+
+        addLikeExprs = []  # 1 + 2
+        conditionLikeExprs = []  # flag ? 1 : 0
+
         for op in ops:
             if isinstance(op, TorqExpression):
                 addLikeExprs.append(op)
             else:
                 opOpen, opClose = op
-                conditionLikeExprs.append(( opOpen, opClose ))
-        
+                conditionLikeExprs.append((opOpen, opClose))
+
         expr0 = Holder()
         termExpr = self._make_term_expr(expr0)
         
         vowExprs = []
         for opOpen, opClose in conditionLikeExprs:
-            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
+            e = opOpen + [0, None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             vowExprs.append(e)
         vowExprs.extend(addLikeExprs)
-        
-        e = termExpr + [1,None] * (Or(*vowExprs) + termExpr)
+
+        e = termExpr + [1, None] * (Or(*vowExprs) + termExpr)
         if pseudoPrefix:
             e = InsertNode(pseudoPrefix) + e
         expr = BuildToNode(self.__gtl, e)
@@ -167,7 +167,7 @@ class OperatorBuilder(object):
         
         ovpExprs = []
         for opOpen, opClose in ops:
-            e = BuildToNode(self.__gtl, opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose)
+            e = BuildToNode(self.__gtl, opOpen + [0, None] * (RequireBut(opClose) + (expr0 | Any())) + opClose)
             ovpExprs.append(e)
         ovpExprs.append(termExpr)
         expr = Or(*ovpExprs)
@@ -181,21 +181,21 @@ if __name__ == '__main__':
     
     kit = OperatorBuilder()
     kit.atomic_term_expr = Rex(r"^\d") | Rex(r"^\w")
-    kit.composed_term_node_labels = ( "t", )
+    kit.composed_term_node_labels = ("t", )
     kit.generated_term_label = "t"
     
     descAndExprs = []
     #descAndExprs.append(( "atomicExpr", kit.build_atom_to_term_expr() ))
-    descAndExprs.append(( "funcCallExpr", kit.build_tO_expr(( BuildToNode("CL", Literal("(")), BuildToNode("CR", Literal(")")) ), pseudoPrefix="TO") ))
-    descAndExprs.append(( "parenExpr", kit.build_O_expr(( BuildToNode("PL", Literal("(")), BuildToNode("PR", Literal(")")) )) ))
-    descAndExprs.append(( "indexExpr", kit.build_tO_expr(( Literal("["), Literal("]") )) ))
-    descAndExprs.append(( "unaryMinusExpr", kit.build_Ot_expr(Literal("-")) ))
-    descAndExprs.append(( "binaryStarExpr", kit.build_tOt_expr(Literal("*")) ))
-    descAndExprs.append(( "binaryMinusExpr", kit.build_tOt_expr(Literal("-")) ))
-    descAndExprs.append(( "conditionExpr", kit.build_tOt_expr(( Literal("?"), Literal(":") ), pseudoPrefix="TOT") ))
-    
+    descAndExprs.append(("funcCallExpr", kit.build_tO_expr((BuildToNode("CL", Literal("(")), BuildToNode("CR", Literal(")"))), pseudoPrefix="TO")))
+    descAndExprs.append(("parenExpr", kit.build_O_expr((BuildToNode("PL", Literal("(")), BuildToNode("PR", Literal(")"))))))
+    descAndExprs.append(("indexExpr", kit.build_tO_expr((Literal("["), Literal("]")))))
+    descAndExprs.append(("unaryMinusExpr", kit.build_Ot_expr(Literal("-"))))
+    descAndExprs.append(("binaryStarExpr", kit.build_tOt_expr(Literal("*"))))
+    descAndExprs.append(("binaryMinusExpr", kit.build_tOt_expr(Literal("-"))))
+    descAndExprs.append(("conditionExpr", kit.build_tOt_expr((Literal("?"), Literal(":")), pseudoPrefix="TOT")))
+
     text = "-1-2*(3-4)-a[5]*6?7:8-9?b(c-1,d):e"
-    seq = [ 'code' ] + split_to_strings(text, re.compile(r"[a-z]+|(\d|[.])+|[-+*/%()?:,]|\[|\]"))
+    seq = ['code'] + split_to_strings(text, re.compile(r"[a-z]+|(\d|[.])+|[-+*/%()?:,]|\[|\]"))
     for desc, expr in descAndExprs:
         print "step: %s" % desc
         seq = expr.parse(seq)

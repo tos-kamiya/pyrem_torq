@@ -2,12 +2,13 @@
 
 from base_expression import TorqExpressionWithExpr
 
+
 class SubApply(TorqExpressionWithExpr):
     ''' Applies a given (Python) function to a (sub-)sequence, to which a given expr matches. 
         In the result of parsing, the sub-sequence is replaced with a return value of the function.
     '''
-    __slots__ = [ '__func', '__labels', '__newLabels' ]
-    
+    __slots__ = ['__func', '__labels', '__newLabels']
+
     def __init__(self, func, expr, new_labels=None, labels=None):
         self.__func = func
         self._set_expr(expr)
@@ -50,7 +51,7 @@ class SubApply(TorqExpressionWithExpr):
         # be careful. equality of functions is determined by reference, not by value,
         # when two SubApply objects are compared with method __eq__.
     
-    def __repr__(self): return "SubApply(%s,%s)" % ( repr(self.__func), repr(self.expr) )
+    def __repr__(self): return "SubApply(%s,%s)" % (repr(self.__func), repr(self.expr))
     def __hash__(self): return hash("SubApply") + hash(self.__func) + hash(self.expr)
     
     def getMatchCandidateForLookAhead(self): return self._expr.getMatchCandidateForLookAhead()

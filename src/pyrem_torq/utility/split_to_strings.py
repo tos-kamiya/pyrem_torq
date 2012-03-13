@@ -2,7 +2,8 @@
 
 import re
 
-_default_splitting_pattern_arguments = ( r"\d+|[a-zA-Z]+|\r\n|.", re.DOTALL )
+_default_splitting_pattern_arguments = (r"\d+|[a-zA-Z]+|\r\n|.", re.DOTALL)
+
 
 def split_to_strings(s, pattern=None):
     r = []; r_append = r.append

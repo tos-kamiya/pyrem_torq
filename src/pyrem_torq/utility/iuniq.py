@@ -2,6 +2,7 @@
 
 import itertools
 
+
 def iuniq(enu):
     ps, qs = itertools.tee(enu, 2)
     yield ps.next()

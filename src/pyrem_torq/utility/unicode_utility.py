@@ -1,10 +1,12 @@
 #coding: utf-8
 
 if hasattr("123", "__int__") or hasattr(u"123", "__int__"):
-    raise ImportError, "module pyrem_torq.utility assumes str type doesn't have a method __int__()"
+    raise ImportError("module pyrem_torq.utility assumes str type doesn't have a method __int__()")
+
 
 class SurrogatePairCollapsed(ValueError):
     pass
+
 
 def to_codepoint_list(s):
     assert isinstance(s, unicode)
@@ -59,8 +61,8 @@ except:
         assert isinstance(s, unicode)
         r = []; r_append = r.append
         for c in s:
-            if u'\udc00' <= c <= u'\udfff': # lower of a surrogate pair
-                assert u'\ud800' <= r[-1] <= u'\udbff' # upper of a surrogate pair
+            if u'\udc00' <= c <= u'\udfff':  # lower of a surrogate pair
+                assert u'\ud800' <= r[-1] <= u'\udbff'  # upper of a surrogate pair
                 r[-1] += c
             else:
                 r_append(c)

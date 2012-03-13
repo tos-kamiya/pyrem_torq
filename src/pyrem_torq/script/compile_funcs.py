@@ -21,13 +21,16 @@ from pyrem_torq.utility import split_to_strings
 
 _newLineExpr = _pte.Or(*map(_pte.Literal, ['\r', '\n', '\r\n']))
 
+
 def __fill(itemExpr, errorMessage):
-    return [0,]*itemExpr + (_pte.EndOfNode() | _pte.ErrorExpr(errorMessage))
+    return [0, ] * itemExpr + (_pte.EndOfNode() | _pte.ErrorExpr(errorMessage))
+
 
 class CompileError(StandardError):
     def __init__(self, message, referenceNode):
         StandardError.__init__(self, message)
         self.referenceNode = referenceNode
+
 
 def parse_to_ast(inputSeq, verboseOutput=None):
     A = _pte.Any
@@ -35,7 +38,8 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     BtN = _pte.BuildToNode
     IN = _pte.InsertNode
     L = _pte.Literal
-    def LC(strs): return _pte.Or(*map(_pte.Literal, strs)) #    LC = _pte.LiteralClass
+
+    def LC(strs): return _pte.Or(*map(_pte.Literal, strs))  # LC = _pte.LiteralClass
     N = _pte.Node
     NM = _pte.NodeMatch
     R = _pte.Rex
@@ -72,9 +76,9 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 return BtN(label, e)
             tokenExpr = _pte.Or(
                 # spaces/comments
-                markNull(BtN("space", [1,]*R(r"^\s$"))),
-                markNull(BtN("comment", L('#') + [0,]*XtA(LC(["\n", "\r", "\r\n"])))),
-                
+                markNull(BtN("space", [1, ] * R(r"^\s$"))),
+                markNull(BtN("comment", L('#') + [0, ] * XtA(LC(["\n", "\r", "\r\n"])))),
+
                 # operators
                 rst("insert_subtree", "<", "-"),
                 rst("comma", ","), rst("semicolon", ";"),
@@ -85,19 +89,18 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 rst("search", "~"),
                 
                 # string literal
-                BtN("string_literal", [0,1]*LC([ 'i', 'ir', 'r', 'ri' ]) + L('"') + [0,]*(
-                    L('\\') + XtA(LC([ '\t', '\n', '\r', '\f', '\v' ])) | \
-                    XtA(LC([ '"', '\t', '\n', '\r', '\f', '\v' ]))
+                BtN("string_literal", [0, 1] * LC(['i', 'ir', 'r', 'ri']) + L('"') + [0, ] * (L('\\') + XtA(LC(['\t', '\n', '\r', '\f', '\v'])) | \
+                    XtA(LC(['"', '\t', '\n', '\r', '\f', '\v']))
                 ) + L('"')),
                 L('"') + _pte.ErrorExpr('Invalid string literal'),
                 
                 # identifier (or reserved word)
-                BtN("id", L('_') + [0,]*(L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]")) | 
-                        R(r"^[a-zA-Z]") + [0,]*(L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]"))),
-                
+                BtN("id", L('_') + [0, ] * (L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]")) |
+                        R(r"^[a-zA-Z]") + [0, ] * (L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]"))),
+
                 # marker
-                BtN('marker', 
-                    markNull(BtN('markerop', L('@'))) + [0,]*(L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]")))
+                BtN('marker',
+                    markNull(BtN('markerop', L('@'))) + [0, ] * (L('_') | R(r"^[a-zA-Z]") | R(r"^[0-9]")))
                     | L('@') + _pte.ErrorExpr('Invalid marker name')
             )
             return __fill(tokenExpr, "Can't extract a token")
@@ -130,13 +133,13 @@ def parse_to_ast(inputSeq, verboseOutput=None):
             parenExpr = Holder('parenExpr')
             parenExpr.expr = XtA((N('LP') | N('RP'))) \
                 | BtN('apply', IN('insert_subtree') + markNull(N('LP')) + (N('id') | N('null')) + markNull(N('insert_subtree')) + markNull(N('RP'))) \
-                | BtN('param',  markNull(N('LP')) + [0,]*parenExpr + markNull(N('RP')))
+                | BtN('param',  markNull(N('LP')) + [0, ] * parenExpr + markNull(N('RP')))
             return __fill(parenExpr.expr, "Can't parse parens")
         seq[:] = parseParenExpr().parse(seq)
         seq[:] = seq_split_nodes_of_label(seq, "null")[0]
-    
-    def recurseApplyAndParam(marker): return NM('apply', A() + [0,]*marker) | NM('param', [0,]*marker)
-    
+
+    def recurseApplyAndParam(marker): return NM('apply', A() + [0, ] * marker) | NM('param', [0, ] * marker)
+
     with verbose_print_step_title_and_result_seq('parseParen'):
         def parseUnaryOperatorsExpr():
             unaryOperatorExpr = Holder('unaryOperatorExpr')
@@ -168,7 +171,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
         def parseBinaryOperatorSeqExpr():
             seqExpr = Holder('seqExpr')
             term = recurseApplyAndParam(seqExpr) | XtA(N('comma'))
-            seqExpr.expr = BtN('apply', IN('seq') + term + [1,]*(markNull(N('comma')) + term)) \
+            seqExpr.expr = BtN('apply', IN('seq') + term + [1, ] * (markNull(N('comma')) + term)) \
                 | term
             return __fill(seqExpr, "Can't parse binary operator Seq (,)")
         seq[:] = parseBinaryOperatorSeqExpr().parse(seq)
@@ -178,8 +181,8 @@ def parse_to_ast(inputSeq, verboseOutput=None):
         def parseBinaryOperatorOrExpr():
             orExpr = Holder('orExpr')
             term = recurseApplyAndParam(orExpr) | XtA(N('or'))
-            orExpr.expr = BtN('apply', 
-                IN('or') + term + [1,]*(markNull(N('or')) + term)) \
+            orExpr.expr = BtN('apply',
+                IN('or') + term + [1, ] * (markNull(N('or')) + term)) \
                 | term
             return __fill(orExpr.expr, "Can't parse binary operator Or (|)")
         seq[:] = parseBinaryOperatorOrExpr().parse(seq)
@@ -201,7 +204,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     with verbose_print_step_title_and_result_seq('parseReduceRedundantParen'):
         def parseReduceRedundantParenExpr():
             paramExpr = Holder('paramExpr')
-            term = NM('apply', A() + [0,]*paramExpr) | XtA(N('param'))
+            term = NM('apply', A() + [0, ] * paramExpr) | XtA(N('param'))
             paramExpr.expr = flattened(NM('param', paramExpr)) \
                 | NM('param', AN()) \
                 | term
@@ -217,12 +220,14 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     #print "\n".join(seq_pretty(seq))
     return seq
 
+
 class InvalidLiteral(ValueError): pass
 class InvalidBackquote(InvalidLiteral): pass
 class InvalidBackquoteSurrogatePairNotSupportedYet(InvalidBackquote): pass
 class IgnoreCaseForNonAlphabetChar(ValueError): pass
 
-__specials = { 'a':"\a", 'b':"\b", 'f':"\f", 'n':"\n", 'r':"\r", 't':"\t", 'v':"\v" }
+__specials = {'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v"}
+
 
 def eval_backquote_str(s):
     assert s[0] == '\\'
@@ -237,20 +242,21 @@ def eval_backquote_str(s):
         return __specials[c], 2
     elif c == 'u':
         assert len(s) >= 2 + 4
-        codePoint = int(s[2:2+4], 16)
+        codePoint = int(s[2:2 + 4], 16)
         if 0xd800 <= codePoint <= 0xdfff:
             raise InvalidBackquoteSurrogatePairNotSupportedYet
         return unichr(codePoint), 2 + 4
     elif c == 'U':
         assert len(s) >= 2 + 8
-        codePoint = int(s[2:2+8], 16)
+        codePoint = int(s[2:2 + 8], 16)
         return unichr(codePoint), 2 + 8
     elif c == 'x':
         assert len(s) >= 2 + 2
-        codePoint = int(s[2:2+2], 16)
+        codePoint = int(s[2:2 + 2], 16)
         return chr(codePoint), 2 + 2
     else:
         raise InvalidBackquote
+
 
 def __unescape(s):
     parts = []
@@ -267,7 +273,8 @@ def __unescape(s):
             parts.append(s[i:])
             i = len_s
     return "".join(parts)
-    
+
+
 def convert_literal_to_expression_object(s):
     s0 = s
     ignoreCase = False
@@ -282,8 +289,8 @@ def convert_literal_to_expression_object(s):
     elif s[0:1] == 'r':
         regex = True
         s = s[1:]
-        
-    assert s # is not empty
+
+    assert s  # is not empty
     assert s[0] == '\"'
     assert s[-1] == '\"'
     s = s[1:-1]
@@ -303,7 +310,8 @@ def convert_literal_to_expression_object(s):
 
 def _nodeNameIn(seq, names): 
     return len(seq) >= 1 and seq[0] in names
-    
+
+
 def _cnv_i(seq, replaceTable, literalExprPool):
     def _marker2Label(seq):
         assert seq[0] == 'marker'
@@ -311,10 +319,10 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         if len(seq) == 2 and seq[1] in ("req", "reqbut", 'any', 'any_node', 'error'):
             return None
         return "".join(seq[2::2])
-        
-    _alpha_Set = frozenset(list(string.ascii_letters) + [ '_' ])
-    _alnum_Set = frozenset(list(string.ascii_letters) + [ '_' ] + list(string.digits))
-    
+
+    _alpha_Set = frozenset(list(string.ascii_letters) + ['_'])
+    _alnum_Set = frozenset(list(string.ascii_letters) + ['_'] + list(string.digits))
+
     def _id2Label(seq):
         if not(len(seq) >= 3): return None
         if seq[0] != 'id': return None
@@ -323,13 +331,13 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         for ss in s[1:]:
             if ss[0] not in _alnum_Set: return None
         return "".join(s)
-    
-    _nameToRep = { 'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore }
-    _nameToOrSeq = { 'or': _pte.Or, 'seq': _pte.Seq }
+
+    _nameToRep = {'ques': _pte.Repeat.ZeroOrOne, 'star': _pte.Repeat.ZeroOrMore, 'plus': _pte.Repeat.OneOrMore}
+    _nameToOrSeq = {'or': _pte.Or, 'seq': _pte.Seq}
     #_nameToOrSeq = { 'or': OrExpr, 'seq': SeqExpr }
-    _nameToBuiltinFunc = { 'req': _pte.Require, 'reqbut': _pte.RequireBut, 'anybut': _pte.AnyBut, 'search' : _pte.Search }
-    _nameToJoin = { 'joinplus': lambda s, i: _pte.Join(s, i, 2, None), 'joinstar': _pte.Join.OneOrMore }
-    
+    _nameToBuiltinFunc = {'req': _pte.Require, 'reqbut': _pte.RequireBut, 'anybut': _pte.AnyBut, 'search': _pte.Search}
+    _nameToJoin = {'joinplus': lambda s, i: _pte.Join(s, i, 2, None), 'joinstar': _pte.Join.OneOrMore}
+
     len_seq = len(seq)
     
     assert len_seq >= 1
@@ -339,7 +347,7 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         seq1NodeName = seq1[0] if len(seq1) >= 1 else None
         if seq1NodeName == 'matches':
             is_flatten = False
-            if _nodeNameIn(seq[2], ( 'expand', )):
+            if _nodeNameIn(seq[2], ('expand', )):
                 is_flatten = True
                 del seq[2]; len_seq = len(seq)
             if len_seq != 4: raise CompileError("Invalid NodeMatch(::) expr", seq1)
@@ -379,11 +387,11 @@ def _cnv_i(seq, replaceTable, literalExprPool):
             return _nameToRep[seq1[0]](r)
         elif seq1NodeName in _nameToOrSeq:
             if not(len_seq >= 2): raise CompileError("Invalid Or(|)/Seq(,) expr", seq1)
-            r = [ _cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
+            r = [_cnv_i(item, replaceTable, literalExprPool) for item in seq[2:]]
             return _nameToOrSeq[seq1[0]](*r)
         elif seq1NodeName in _nameToJoin:
             if len_seq != 4: raise CompileError("Invalid ++/** expr", seq1)
-            r = [ _cnv_i(item, replaceTable, literalExprPool) for item in seq[2:] ]
+            r = [_cnv_i(item, replaceTable, literalExprPool) for item in seq[2:]]
             return _nameToJoin[seq1[0]](*r)
         else:
             assert False
@@ -420,7 +428,8 @@ def _cnv_i(seq, replaceTable, literalExprPool):
         return pooledExpr
     else:
         raise CompileError("Invalid Token", seq)
-        
+
+
 def _to_dict(replaces):
     if not replaces: 
         return {}
@@ -429,7 +438,8 @@ def _to_dict(replaces):
     except:
         assert len(replaces) == 2
         assert isinstance(replaces[1], _pte.TorqExpression)
-        return { replaces[0]:replaces[1] }
+        return {replaces[0]: replaces[1]}
+
 
 def convert_to_expression_object(seq, replaces=None):
     replaceTable = _to_dict(replaces)
@@ -437,7 +447,7 @@ def convert_to_expression_object(seq, replaces=None):
         raise ValueError("replaces must not include an item with key '0'")
     for label, expr in replaceTable.iteritems():
         assert isinstance(expr, _pte.TorqExpression)
-    expr0 = _pte.Holder() # prepare expr0 for an entry point of recursion
+    expr0 = _pte.Holder()  # prepare expr0 for an entry point of recursion
     replaceTable['0'] = expr0
         
     assert len(seq) >= 1 and seq[0] == 'code'
@@ -448,23 +458,24 @@ def convert_to_expression_object(seq, replaces=None):
     assert len(seq) == 2
     statementSeq = seq[1]
     len_statementSeq = len(statementSeq)
-    
-    assert len_statementSeq in ( 2, 3 )
+
+    assert len_statementSeq in (2, 3)
     if statementSeq[0] != 'statement':
         raise CompileError("Expected Statement", statementSeq)
     if len_statementSeq == 2:
-        assert _nodeNameIn(statementSeq[1], ( 'semicolon' ))
+        assert _nodeNameIn(statementSeq[1], ('semicolon'))
         return None
     elif len_statementSeq == 3:
-        if not _nodeNameIn(statementSeq[2], ( 'semicolon' )):
+        if not _nodeNameIn(statementSeq[2], ('semicolon')):
             raise CompileError("Invalid Statement", statementSeq)
         literalExprPool = {}
         expr = _cnv_i(statementSeq[1], replaceTable, literalExprPool)
-        
-        expr0.expr = expr # set up the recursion
+
+        expr0.expr = expr  # set up the recursion
         return expr
     else:
         assert False
+
 
 def compile(src, replaces=None):
     ''' Compile a string src as a troq source code and return a expression as a result of the compilation.
@@ -477,6 +488,6 @@ def compile(src, replaces=None):
     try:
         seq = parse_to_ast(src)
     except _pte.InterpretError, e:
-        raise CompileError("pos %s: error: %s" % ( repr(e.stack), str(e) ), None)
-    
+        raise CompileError("pos %s: error: %s" % (repr(e.stack), str(e)), None)
+
     return convert_to_expression_object(seq, replaces=replaces)
