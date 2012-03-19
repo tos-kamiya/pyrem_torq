@@ -64,7 +64,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     
     with verbose_print_step_title_and_result_seq('input'):
         pat = re.compile(r"\d+|[a-z_][a-z_0-9]*|\r\n|.", re.DOTALL | re.IGNORECASE)
-        s = [ 'code' ] + split_to_strings(inputSeq, pat)
+        s = ['code'] + split_to_strings(inputSeq, pat)
         seq[:] = s
     
     with verbose_print_step_title_and_result_seq('ParseToken'):
@@ -109,7 +109,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
     
     with verbose_print_step_title_and_result_seq('parseReservedWords'):
         def parseReservedWordsExpr():
-            def rw(name): return relabeled(name, NM('id', L(name))) # reserved word
+            def rw(name): return relabeled(name, NM('id', L(name)))  # reserved word
             reservedWordExpr = rw('req') | rw('error') | rw('any')
             return _pte.Search(reservedWordExpr)
         seq[:] = parseReservedWordsExpr().parse(seq)
@@ -133,7 +133,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
             parenExpr = Holder('parenExpr')
             parenExpr.expr = XtA((N('LP') | N('RP'))) \
                 | BtN('apply', IN('insert_subtree') + markNull(N('LP')) + (N('id') | N('null')) + markNull(N('insert_subtree')) + markNull(N('RP'))) \
-                | BtN('param',  markNull(N('LP')) + [0, ] * parenExpr + markNull(N('RP')))
+                | BtN('param', markNull(N('LP')) + [0, ] * parenExpr + markNull(N('RP')))
             return __fill(parenExpr.expr, "Can't parse parens")
         seq[:] = parseParenExpr().parse(seq)
         seq[:] = seq_split_nodes_of_label(seq, "null")[0]
@@ -148,7 +148,7 @@ def parse_to_ast(inputSeq, verboseOutput=None):
                 BtN('error', markNull(N('error')) + flattened(N('string_literal'))),
                 BtN('error', markNull(N('error')) + \
                     flattened(NM('param', flattened(N('string_literal'))))),
-                N('diamond') + N('id') + N('matches'), # special form
+                N('diamond') + N('id') + N('matches'),  # special form
                 BtN('apply', IN("expand") + markNull(N('diamond')) + N('id')),
                 N('diamond') + _pte.ErrorExpr('operator [] only applicable to a node'),
                 A())

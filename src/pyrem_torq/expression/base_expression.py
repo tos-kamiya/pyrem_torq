@@ -194,7 +194,7 @@ class TorqExpressionWithExpr(TorqExpression):
         self._expr = expr
         self._calc_mc4la()
 
-    def extract_exprs(self):  return [self._expr]
+    def extract_exprs(self): return [self._expr]
 
 
 class TorqExpressionSingleton(TorqExpression):
@@ -354,7 +354,7 @@ class Seq(TorqExpression):
             ls = ls | r.literals
             if not r.emptyseq:
                 acceptEmpty = False
-                break # for r
+                break  # for r
         self.__mc4la = MatchCandidateForLookAhead(
                 nodes=ns, literals=ls, emptyseq=acceptEmpty)
     
@@ -476,9 +476,9 @@ class Repeat(TorqExpressionWithExpr):
                 r = self._expr._match_lit(inpSeq, curInpPos, (lookAhead, inpSeq[curInpPos + 1]))
             if r is None:
                 if count < 0: return None
-                break # for count
+                break  # for count
             p, o = r
-            if p == 0 and count >= 0: break # in order to avoid infinite loop
+            if p == 0 and count >= 0: break  # in order to avoid infinite loop
             curInpPos += p; o_xt(o)
             count += 1
         if curInpPos == len_inpSeq and count < 0:

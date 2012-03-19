@@ -28,20 +28,20 @@ class OperatorBuilder(object):
     atomic_term_expr = property(get_atomic_term_expr, set_atomic_term_expr)
     
     def set_composed_term_node_labels(self, labels):
-        for lbl in labels: assert lbl # is not empty
+        for lbl in labels: assert lbl  # is not empty
         self.__ctnls = frozenset(lbl for lbl in labels)
     def get_composed_term_node_labels(self):
         return sorted(self.__ctnls)
     composed_term_node_labels = property(get_composed_term_node_labels, set_composed_term_node_labels)
     
     def set_generated_term_label(self, label): 
-        assert label # is not empty string
+        assert label  # is not empty string
         self.__gtl = label
     def get_generated_term_label(self, label): return self.__gtl
     generated_term_label = property(get_generated_term_label, set_generated_term_label)
     
     def _make_term_expr(self, expr0):
-        terms = [ self.__ate ]
+        terms = [self.__ate]
         terms.extend(NodeMatch(lbl, Search(expr0)) for lbl in self.__ctnls)
         return Or(*terms)
     
@@ -73,7 +73,7 @@ class OperatorBuilder(object):
         
         ovExprs = []
         for opOpen, opClose in castLikeExprs:
-            e = opOpen + [0,None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
+            e = opOpen + [0, None] * (RequireBut(opClose) + (expr0 | Any())) + opClose
             ovExprs.append(e)
         ovExprs.extend(signLikeExprs)
 
@@ -117,7 +117,7 @@ class OperatorBuilder(object):
             e = op + whereTermShouldNotAppear
             voExprs.append(e)
         
-        e = termExpr + [1,None] * Or(*voExprs)
+        e = termExpr + [1, None] * Or(*voExprs)
         if pseudoPrefix:
             e = InsertNode(pseudoPrefix) + e
         expr = BuildToNode(self.__gtl, e)
