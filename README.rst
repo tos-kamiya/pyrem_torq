@@ -2,9 +2,10 @@
 Pyrem Torq README
 ==================
 
-Pyrem Torq is a library for relaxed parsing of programming languages.
+Pyrem Torq is a library to build a relaxed parser of programming languages.
 
-Currently, supported programming languages are: C++03 (not 11), Java, Python.
+Currently, Pyrem Torq is used as an engine of parser of a tool named Quartet,
+which includes parsers C++03 (not 11), Java, and Python.
 
 The official site is: http://www.remics.org/pyrem_torq/ .
 
